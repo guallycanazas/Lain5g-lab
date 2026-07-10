@@ -27,13 +27,13 @@ RUN git clone --depth 1 --branch "${UERANSIM_VERSION}" https://github.com/aligun
     && if [ -n "${UERANSIM_COMMIT}" ]; then \
         git fetch --depth 1 origin "${UERANSIM_COMMIT}" && git checkout "${UERANSIM_COMMIT}"; \
     fi \
-    && make \
+    && make -j"$(nproc)" \
     && install -m 0755 build/nr-gnb /usr/local/bin/nr-gnb \
     && install -m 0755 build/nr-ue /usr/local/bin/nr-ue \
     && command -v nr-gnb \
     && command -v nr-ue \
-    && nr-gnb --version >/dev/null 2>&1 || true \
-    && nr-ue --version >/dev/null 2>&1 || true \
+    && (nr-gnb --version >/dev/null 2>&1 || true) \
+    && (nr-ue --version >/dev/null 2>&1 || true) \
     && rm -rf /opt/ueransim/.git
 
 COPY entrypoint.sh /usr/local/bin/lain5g-ueransim-entrypoint

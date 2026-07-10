@@ -114,8 +114,9 @@ services:
   upf:
     image: lain5g-lab/open5gs:local
     container_name: lain5g-lab-5g-sa-upf
-    env_file:
-      - .env
+    environment:
+      UE_SUBNET: ${UE_SUBNET:-10.45.0.0/16}
+      UE_GATEWAY: ${UE_GATEWAY:-10.45.0.1}
     command:
       - open5gs-upfd
       - -c
