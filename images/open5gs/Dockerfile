@@ -53,6 +53,7 @@ RUN git clone --depth 1 --branch "${OPEN5GS_VERSION}" https://github.com/open5gs
     && rm -rf /opt/open5gs/.git /opt/open5gs/build
 
 COPY entrypoint.sh /usr/local/bin/lain5g-open5gs-entrypoint
-RUN chmod +x /usr/local/bin/lain5g-open5gs-entrypoint
+RUN mkdir -p /var/log/open5gs \
+    && chmod +x /usr/local/bin/lain5g-open5gs-entrypoint
 
 ENTRYPOINT ["lain5g-open5gs-entrypoint"]
