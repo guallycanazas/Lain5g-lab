@@ -3,6 +3,7 @@ from functools import lru_cache
 from .services.command_service import CommandService
 from .services.deployment_service import DeploymentService
 from .services.open5gs_connection_service import Open5GSConnectionService
+from .services.profile_config_service import ProfileConfigService
 from .services.run_service import RunService
 from .services.subscriber_service import SubscriberService
 from .services.validation_service import ValidationService
@@ -39,6 +40,11 @@ def get_open5gs_connection_service() -> Open5GSConnectionService:
 @lru_cache
 def get_subscriber_service() -> SubscriberService:
     return SubscriberService(get_settings(), get_open5gs_connection_service())
+
+
+@lru_cache
+def get_profile_config_service() -> ProfileConfigService:
+    return ProfileConfigService(get_settings())
 
 
 def settings_dependency() -> Settings:

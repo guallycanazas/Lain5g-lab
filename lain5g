@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import json
+import os
+import sys
+from pathlib import Path
+from types import SimpleNamespace
+
+from backend.app.services.profile_config_service import ProfileConfigError, ProfileConfigService
+
+
+FIELDS = {
+    "4g-volte-sim": [
+        ("network.mcc", "MCC"), ("network.mnc", "MNC"), ("network.tac", "TAC"),
+        ("network.apn_internet", "APN internet"), ("network.apn_ims", "APN IMS"),
+        ("subscriber.imsi", "IMSI"), ("subscriber.msisdn", "MSISDN"), ("ims.domain", "IMS domain"),
+    ],
+    "4g-lte-x310": [
+        ("network.mcc", "MCC"), ("network.mnc", "MNC"), ("network.tac", "TAC"),
+        ("network.apn_internet", "APN internet"), ("core.mme_addr", "MME address"), ("ran.enb_bind_addr", "eNB bind address"),
+        ("radio.usrp_addr", "USRP address"), ("radio.lte_band", "LTE band"), ("radio.earfcn", "EARFCN"),
+        ("radio.tx_gain", "TX gain"), ("radio.rx_gain", "RX gain"), ("safety.maximum_duration_seconds", "Maximum duration seconds"),
+    ],
+    "5g-sa": [
+        ("network.mcc", "MCC"), ("network.mnc", "MNC"), ("network.tac", "TAC"), ("network.dnn", "DNN"),
+        ("network.slice.sst", "SST"), ("network.slice.sd", "SD"), ("subscriber.imsi", "IMSI"),
+    ],
+    "5g-sa-x310": [
+        ("network.mcc", "MCC"), ("network.mnc", "MNC"), ("network.tac", "TAC"), ("network.dnn", "DNN"),
+        ("network.slice.sst", "SST"), ("network.slice.sd", "SD"), ("core.amf_addr", "AMF address"),
+        ("core.gnb_bind_addr", "gNB bind address"), ("core.n3_bind_addr", "N3 bind address"), ("radio.usrp_addr", "USRP address"),
+        ("radio.band", "NR band"), ("radio.dl_arfcn", "DL ARFCN"), ("radio.tx_gain", "TX gain"), ("radio.rx_gain", "RX gain"),
+        ("safety.maximum_duration_seconds", "Maximum duration seconds"),
+    ],
+    "5g-vonr": [
+        ("network.mcc", "MCC"), ("network.mnc", "MNC"), ("network.tac", "TAC"),
+        ("network.dnn_internet", "DNN internet"), ("network.dnn_ims", "DNN IMS"), ("network.slice.sst", "SST"),
+        ("network.slice.sd", "SD"), ("subscriber.imsi", "IMSI"), ("subscriber.msisdn", "MSISDN"), ("ims.domain", "IMS domain"),
+    ],
+}
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) < 2 or argv[0] != "profile":
+        print("Usage: lain5g profile list|show|configure|validate|diff|apply|restore [profile]", file=sys.stderr)
+        return 2
+    project_root = Path(os.environ.get("LAIN5G_PROJECT_ROOT", Path(__file__).resolve().parent))
+    service = ProfileConfigService(SimpleNamespace(project_root=project_root))
+    action = argv[1]
+    profile_id = argv[2] if len(argv) > 2 else ""
+    try:
+        if action == "list":
+            for item in service.list_profiles():
+                print(item["profile"])
+            return 0
+        if not profile_id:
+            print("Missing profile id", file=sys.stderr)
+            return 2
+        if action == "show":
+            print(json.dumps(service.get_profile(profile_id), indent=2, sort_keys=True))
+            return 0
+        if action == "validate":
+            result = service.validate_profile(profile_id)
+            _print_validation(result)
+            return 0 if result["valid"] else 1
+        if action == "diff":
+            for item in service.diff_profile(profile_id)["files"]:
+                if item["changed"]:
+                    print(item["diff"], end="")
+            return 0
+        if action == "configure":
+            profile = service.get_profile(profile_id)
+            for path, label in FIELDS[profile_id]:
+                current = _get(profile, path)
+                raw = input(f"{label} [{'' if current is None else current}]: ").strip()
+                if raw:
+                    _set(profile, path, _coerce(raw, current))
+            updated = service.update_profile(profile_id, profile)
+            print(json.dumps(updated, indent=2, sort_keys=True))
+            return 0
+        if action == "apply":
+            validation = service.validate_profile(profile_id)
+            _print_validation(validation)
+            if not validation["valid"]:
+                return 1
+            diff = service.diff_profile(profile_id)
+            changed = [item for item in diff["files"] if item["changed"]]
+            print(f"{len(changed)} files will be modified.")
+            answer = input("Apply changes? [y/N] ").strip().lower()
+            if answer not in {"y", "yes"}:
+                print("Aborted.")
+                return 1
+            print(json.dumps(service.apply_profile(profile_id), indent=2, sort_keys=True))
+            return 0
+        if action == "restore":
+            print(json.dumps(service.restore_profile(profile_id), indent=2, sort_keys=True))
+            return 0
+    except ProfileConfigError as exc:
+        print(f"{exc.code}: {exc.message}", file=sys.stderr)
+        return 1 if exc.status_code < 500 else 2
+    print(f"Unknown action: {action}", file=sys.stderr)
+    return 2
+
+
+def _print_validation(result: dict) -> None:
+    if result["valid"]:
+        print("Configuration valid.")
+    else:
+        print("Configuration invalid.")
+        for error in result["errors"]:
+            print(f"- {error}")
+
+
+def _get(data: dict, path: str):
+    value = data
+    for part in path.split("."):
+        value = value[part]
+    return value
+
+
+def _set(data: dict, path: str, value) -> None:
+    current = data
+    parts = path.split(".")
+    for part in parts[:-1]:
+        current = current[part]
+    current[parts[-1]] = value
+
+
+def _coerce(raw: str, current):
+    if current is None:
+        return int(raw) if raw.isdigit() else raw
+    if isinstance(current, int):
+        return int(raw)
+    if raw.lower() == "null":
+        return None
+    return raw
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

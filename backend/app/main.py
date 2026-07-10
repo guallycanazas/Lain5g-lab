@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .api import deployments, health, runs, subscribers, validation
+from .api import deployments, health, profiles, runs, subscribers, validation
 from .models.deployment import ErrorDetail, ErrorResponse
 from .services.command_service import CommandSecurityError
 from .services.deployment_service import DeploymentCommandError, DeploymentConflictError, DeploymentNotFoundError
@@ -23,7 +23,7 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_credentials=False,
-        allow_methods=["GET", "POST", "PATCH", "DELETE"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["*"],
     )
 
@@ -31,6 +31,7 @@ def create_app() -> FastAPI:
     app.include_router(deployments.router)
     app.include_router(runs.router)
     app.include_router(subscribers.router)
+    app.include_router(profiles.router)
     app.include_router(validation.router)
 
     register_exception_handlers(app)
@@ -65,6 +66,12 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(SubscriberServiceError)
     async def subscriber_error_handler(request: Request, exc: SubscriberServiceError) -> JSONResponse:
+        return error_response(exc.status_code, exc.code, exc.message)
+
+    from .services.profile_config_service import ProfileConfigError
+
+    @app.exception_handler(ProfileConfigError)
+    async def profile_config_error_handler(request: Request, exc: ProfileConfigError) -> JSONResponse:
         return error_response(exc.status_code, exc.code, exc.message)
 
     @app.exception_handler(Exception)
