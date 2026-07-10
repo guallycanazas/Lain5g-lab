@@ -5,7 +5,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends bash ca-certificates curl git gnupg \
+    && apt-get install -y --no-install-recommends bash ca-certificates curl git gnupg iproute2 iputils-ping \
     && install -m 0755 -d /etc/apt/keyrings \
     && curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc \
     && chmod a+r /etc/apt/keyrings/docker.asc \
