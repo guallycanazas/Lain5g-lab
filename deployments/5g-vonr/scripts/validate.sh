@@ -16,7 +16,7 @@ add_metric(){ metrics+=("$1|$2"); }
 json_escape(){ local s="$1"; s="${s//\\/\\\\}"; s="${s//\"/\\\"}"; printf '%s' "$s"; }
 compose(){ (cd "$scenario_dir" && docker compose --env-file .env -f docker-compose.yml --profile sip "$@"); }
 running(){ [ -n "$(compose ps --status running -q "$1" 2>/dev/null)" ]; }
-logs_have(){ compose logs --no-color "$1" 2>/dev/null | grep -Eiq "$2"; }
+logs_have(){ local output; output="$(compose logs --no-color "$1" 2>/dev/null || true)"; grep -Eiq "$2" <<< "$output"; }
 exec_ok(){ local svc="$1"; shift; compose exec -T "$svc" "$@" >/tmp/lain5g-vonr-validate.$$ 2>&1; }
 exec_out(){ local svc="$1"; shift; compose exec -T "$svc" "$@" 2>/dev/null; }
 
