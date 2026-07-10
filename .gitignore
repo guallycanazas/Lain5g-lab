@@ -3,6 +3,11 @@
 deployments/4g-volte/common/.env
 deployments/4g-volte/x310/rf/channel-plan.yaml
 deployments/4g-volte/x310/rf/safety-manifest.yaml
+deployments/5g-sa-x310/.env
+deployments/5g-sa-x310/.rf-active
+deployments/5g-sa-x310/gnb/.runtime/
+deployments/5g-sa-x310/rf/channel-plan.yaml
+deployments/5g-sa-x310/rf/safety-manifest.yaml
 deployments/5g-vonr/.env
 deployments/5g-vonr/ueransim/.runtime/
 backend/.env
