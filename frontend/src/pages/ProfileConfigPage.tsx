@@ -13,8 +13,8 @@ const SECTIONS: Record<string, Array<[string, string, string]>> = {
   Núcleo: [['core.amf_addr', 'AMF address', 'text'], ['core.gnb_addr', 'gNB address', 'text'], ['core.mme_addr', 'MME address', 'text'], ['core.gnb_bind_addr', 'gNB bind address', 'text'], ['core.n3_bind_addr', 'N3 bind address', 'text']],
   Abonado: [['subscriber.imsi', 'IMSI', 'text'], ['subscriber.msisdn', 'MSISDN', 'text']],
   IMS: [['ims.domain', 'Dominio IMS', 'text']],
-  Radio: [['ran.enb_bind_addr', 'eNB bind address', 'text'], ['ran.dl_earfcn', 'DL EARFCN', 'number'], ['ran.tx_gain', 'TX gain', 'number'], ['ran.rx_gain', 'RX gain', 'number'], ['radio.usrp_addr', 'USRP address', 'text'], ['radio.lte_band', 'LTE band', 'number'], ['radio.earfcn', 'EARFCN', 'number'], ['radio.band', 'NR band', 'number'], ['radio.dl_arfcn', 'DL ARFCN', 'number'], ['radio.tx_gain', 'TX gain', 'number'], ['radio.rx_gain', 'RX gain', 'number']],
-  'Seguridad RF': [['safety.maximum_duration_seconds', 'Duración máxima', 'number'], ['safety.environment', 'Entorno', 'text']],
+  Radio: [['ran.enb_bind_addr', 'eNB bind address', 'text'], ['ran.dl_earfcn', 'DL EARFCN', 'number'], ['ran.tx_gain', 'TX gain', 'number'], ['ran.rx_gain', 'RX gain', 'number'], ['radio.usrp_addr', 'USRP address', 'text'], ['radio.lte_band', 'LTE band', 'number'], ['radio.earfcn', 'EARFCN', 'number'], ['radio.bandwidth_mhz', 'Channel bandwidth MHz', 'number'], ['radio.band', 'NR band', 'number'], ['radio.dl_arfcn', 'DL ARFCN', 'number'], ['radio.tx_gain', 'TX gain', 'number'], ['radio.rx_gain', 'RX gain', 'number']],
+  'Seguridad RF': [['safety.environment', 'Laboratory mode', 'text'], ['safety.attenuation_db', 'Attenuation dB', 'number'], ['safety.antenna_connected', 'Antenna connected', 'text'], ['safety.shielded_environment', 'Shielded environment', 'text'], ['safety.auto_stop', 'Auto-stop enabled', 'text'], ['safety.authorization_confirmed', 'RF authorization confirmed', 'text'], ['safety.operator_note', 'Authorization note', 'text'], ['safety.maximum_duration_seconds', 'Duración máxima', 'number']],
 };
 
 export function ProfileConfigPage() {
@@ -99,4 +99,8 @@ function hasPath(data: any, path: string) { return path.split('.').every((part) 
 function getPath(data: any, path: string) { return path.split('.').reduce((value, part) => value?.[part], data); }
 function setPath(data: any, path: string, value: any) { const copy = structuredClone(data); const parts = path.split('.'); let target = copy; for (const part of parts.slice(0, -1)) target = target[part]; target[parts.at(-1)!] = value; return copy; }
 function valueToInput(value: any) { return value === null || value === undefined ? '' : String(value); }
-function inputToValue(value: string, previous: any) { if (value === '') return null; return typeof previous === 'number' ? Number(value) : value; }
+function inputToValue(value: string, previous: any) {
+  if (value === '') return null;
+  if (typeof previous === 'boolean') return ['true', 'yes', '1'].includes(value.toLowerCase());
+  return typeof previous === 'number' ? Number(value) : value;
+}

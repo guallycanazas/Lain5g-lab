@@ -5,11 +5,12 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from backend.app.dependencies import get_profile_config_service
 from backend.app.main import create_app
-from backend.app.services.profile_config_service import ProfileConfigService
+from backend.app.services.profile_config_service import ProfileConfigError, ProfileConfigService
 from backend.app.settings import Settings
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -127,6 +128,93 @@ def test_cli_profile_commands_use_temporary_project(tmp_path: Path):
     validate_result = subprocess.run([str(ROOT / "lain5g"), "profile", "validate", "5g-sa-x310"], cwd=ROOT, env=env, text=True, capture_output=True, check=False)
     assert validate_result.returncode == 1
     assert "radio.band" in validate_result.stdout
+    configure_result = subprocess.run(
+        [str(ROOT / "lain5g"), "profile", "configure", "4g-lte-x310"],
+        cwd=ROOT,
+        env=env,
+        input="\n" * 20,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert configure_result.returncode == 0
+    for prompt in [
+        "Channel bandwidth MHz [5]:",
+        "Laboratory mode [cabled]:",
+        "Attenuation dB [60]:",
+        "Antenna connected [no]:",
+        "Shielded environment [no]:",
+        "Auto-stop enabled [yes]:",
+        "RF authorization confirmed [no]:",
+        "Authorization note []:",
+        "Maximum duration seconds [60]:",
+    ]:
+        assert prompt in configure_result.stdout
+
+
+def test_4g_lte_x310_rf_safety_validation_and_apply_restore(tmp_path: Path):
+    root = make_profile_project(tmp_path)
+    svc = service(root)
+    profile = svc.get_profile("4g-lte-x310")
+    assert profile["safety"]["authorization_confirmed"] is False
+    validation = svc.validate_profile("4g-lte-x310")
+    assert not validation["valid"]
+    assert any("authorization" in error for error in validation["errors"])
+    with pytest.raises(ProfileConfigError):
+        svc.apply_profile("4g-lte-x310")
+
+    profile["safety"]["authorization_confirmed"] = True
+    profile["safety"]["operator_note"] = "Cabled X310 test with 60 dB attenuation."
+    profile["safety"]["auto_stop"] = False
+    svc.update_profile("4g-lte-x310", profile)
+    validation = svc.validate_profile("4g-lte-x310")
+    assert not validation["valid"]
+    assert any("auto_stop=true" in error for error in validation["errors"])
+
+    profile["safety"]["auto_stop"] = True
+    profile["safety"]["operator_note"] = ""
+    svc.update_profile("4g-lte-x310", profile)
+    validation = svc.validate_profile("4g-lte-x310")
+    assert not validation["valid"]
+    assert any("operator_note" in error for error in validation["errors"])
+
+    profile["safety"]["operator_note"] = "Cabled X310 test with 60 dB attenuation."
+    profile["radio"]["lte_band"] = 7
+    profile["radio"]["earfcn"] = 3150
+    profile["radio"]["bandwidth_mhz"] = 5
+    profile["radio"]["tx_gain"] = 20
+    profile["radio"]["rx_gain"] = 30
+    svc.update_profile("4g-lte-x310", profile)
+    validation = svc.validate_profile("4g-lte-x310")
+    assert validation == {"profile": "4g-lte-x310", "valid": True, "errors": []}
+
+    enb_path = root / "deployments/4g-volte/x310/ran/enb.conf"
+    enb_path.write_text(enb_path.read_text(encoding="utf-8").replace("n_prb = 25", "n_prb = 50"), encoding="utf-8")
+    channel_path = root / "deployments/4g-volte/x310/rf/channel-plan.yaml"
+    channel_path.write_text(channel_path.read_text(encoding="utf-8").replace("tx_gain: 20", "tx_gain: 0"), encoding="utf-8")
+    tracked_before_apply = snapshot_files(root)
+
+    diff = svc.diff_profile("4g-lte-x310")
+    assert [file["path"] for file in diff["files"]] == [
+        "deployments/4g-volte/x310/ran/enb.conf",
+        "deployments/4g-volte/x310/rf/channel-plan.yaml",
+        "deployments/4g-volte/x310/rf/safety-manifest.yaml",
+    ]
+    result = svc.apply_profile("4g-lte-x310")
+    expected = {"deployments/4g-volte/x310/ran/enb.conf", "deployments/4g-volte/x310/rf/channel-plan.yaml", "deployments/4g-volte/x310/rf/safety-manifest.yaml"}
+    assert set(result["modified_files"]) == expected
+    assert "n_prb = 25" in enb_path.read_text(encoding="utf-8")
+    assert "authorization_confirmed: true" in (root / "deployments/4g-volte/x310/rf/safety-manifest.yaml").read_text(encoding="utf-8")
+    assert (root / result["backup"] / "deployments/4g-volte/x310/ran/enb.conf").exists()
+    assert changed_paths(tracked_before_apply, snapshot_files(root)) == expected
+
+    restore = svc.restore_profile("4g-lte-x310")
+    assert set(restore["restored_files"]) == expected
+    restored_snapshot = snapshot_files(root)
+    for path, content in tracked_before_apply.items():
+        if path.startswith("config/profiles/4g-lte-x310.yaml"):
+            continue
+        assert restored_snapshot[path] == content
 
 
 def test_no_rf_start_commands_in_profile_service():
