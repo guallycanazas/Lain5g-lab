@@ -44,6 +44,20 @@ if [ "$(basename "$1")" = "open5gs-upfd" ]; then
   ip link set ogstun up
   iptables -t nat -C POSTROUTING -s "$ue_subnet" ! -o ogstun -j MASQUERADE 2>/dev/null \
     || iptables -t nat -A POSTROUTING -s "$ue_subnet" ! -o ogstun -j MASQUERADE
+
+  if [ -n "${UE_IMS_SUBNET:-}" ]; then
+    ims_subnet="$UE_IMS_SUBNET"
+    ims_gateway="${UE_IMS_GATEWAY:-10.61.0.1}"
+    ims_prefix="${ims_subnet#*/}"
+    if [ "$ims_prefix" = "$ims_subnet" ]; then
+      ims_prefix="16"
+    fi
+    ip tuntap add name ogstun2 mode tun 2>/dev/null || true
+    ip addr replace "${ims_gateway}/${ims_prefix}" dev ogstun2
+    ip link set ogstun2 up
+    iptables -t nat -C POSTROUTING -s "$ims_subnet" ! -o ogstun2 -j MASQUERADE 2>/dev/null \
+      || iptables -t nat -A POSTROUTING -s "$ims_subnet" ! -o ogstun2 -j MASQUERADE
+  fi
 fi
 
 exec "$@"

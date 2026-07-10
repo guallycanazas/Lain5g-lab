@@ -24,6 +24,7 @@ IMS_AUTH_PASSWORD = env("IMS_AUTH_PASSWORD")
 IMPI = f"{SUBSCRIBER_IMSI}@{IMS_DOMAIN}"
 IMPU = f"sip:{SUBSCRIBER_MSISDN}@{IMS_DOMAIN}"
 NONCE = secrets.token_hex(16)
+BIND_IP = os.environ.get("SCSCF_BIND_IP", "10.41.0.22")
 
 
 def md5(value: str) -> str:
@@ -98,7 +99,7 @@ def response(message: str, status: int, reason: str, extra_headers: list[str] | 
 
 def main() -> None:
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind(("10.41.0.22", 5060))
+    sock.bind((BIND_IP, 5060))
     print(f"SCSCF_READY impi={IMPI} impu={IMPU}", flush=True)
     while True:
         data, address = sock.recvfrom(65535)

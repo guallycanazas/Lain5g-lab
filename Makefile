@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: build-5g-sa start-5g-sa stop-5g-sa restart-5g-sa status-5g-sa logs-5g-sa validate-5g-sa clean-5g-sa backend-install backend-dev backend-test backend-cov frontend-install frontend-dev frontend-build frontend-test app-build app-up app-down app-logs app-ps subscribers-test subscribers-integration-test build-4g-volte-sim start-4g-volte-sim stop-4g-volte-sim status-4g-volte-sim logs-4g-volte-sim validate-4g-volte-sim test-4g-volte-sim build-4g-lte-x310 check-x310 preflight-4g-lte-x310 start-4g-lte-x310-epc start-4g-lte-x310-rf emergency-stop-4g-lte-x310 stop-4g-lte-x310 status-4g-lte-x310 logs-4g-lte-x310 validate-4g-lte-x310 test-4g-lte-x310
+.PHONY: build-5g-sa start-5g-sa stop-5g-sa restart-5g-sa status-5g-sa logs-5g-sa validate-5g-sa clean-5g-sa backend-install backend-dev backend-test backend-cov frontend-install frontend-dev frontend-build frontend-test app-build app-up app-down app-logs app-ps subscribers-test subscribers-integration-test build-4g-volte-sim start-4g-volte-sim stop-4g-volte-sim status-4g-volte-sim logs-4g-volte-sim validate-4g-volte-sim test-4g-volte-sim build-4g-lte-x310 check-x310 preflight-4g-lte-x310 start-4g-lte-x310-epc start-4g-lte-x310-rf emergency-stop-4g-lte-x310 stop-4g-lte-x310 status-4g-lte-x310 logs-4g-lte-x310 validate-4g-lte-x310 test-4g-lte-x310 build-5g-vonr-sim start-5g-vonr-sim stop-5g-vonr-sim restart-5g-vonr-sim status-5g-vonr-sim logs-5g-vonr-sim validate-5g-vonr-sim test-5g-vonr-sim
 
 build-5g-sa:
 	@if [ "$${LAIN5G_DRY_RUN:-false}" = "true" ]; then \
@@ -169,3 +169,32 @@ validate-4g-lte-x310:
 test-4g-lte-x310:
 	.venv/bin/pytest backend/tests/test_4g_volte_static.py
 	@deployments/4g-volte/x310/scripts/test.sh
+
+build-5g-vonr-sim:
+	docker build -t lain5g-lab/open5gs:local images/open5gs
+	docker build -t lain5g-lab/ueransim:local images/ueransim
+	docker build -t lain5g-lab/kamailio:local images/kamailio
+	docker build -t lain5g-lab/ims-dns:local images/ims-dns
+	docker build -t lain5g-lab/ims-sip:local images/ims-sip
+
+start-5g-vonr-sim:
+	@deployments/5g-vonr/scripts/start.sh
+
+stop-5g-vonr-sim:
+	@deployments/5g-vonr/scripts/stop.sh
+
+restart-5g-vonr-sim:
+	@deployments/5g-vonr/scripts/restart.sh
+
+status-5g-vonr-sim:
+	@deployments/5g-vonr/scripts/status.sh
+
+logs-5g-vonr-sim:
+	@deployments/5g-vonr/scripts/logs.sh
+
+validate-5g-vonr-sim:
+	@deployments/5g-vonr/scripts/validate.sh
+
+test-5g-vonr-sim:
+	.venv/bin/pytest backend/tests/test_5g_vonr_static.py
+	@deployments/5g-vonr/scripts/test.sh

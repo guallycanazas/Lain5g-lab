@@ -18,10 +18,14 @@ def env(name: str) -> str:
     return value
 
 
+def env_default(name: str, default: str) -> str:
+    return os.environ.get(name, default) or default
+
+
 IMS_DOMAIN = env("IMS_DOMAIN")
-PCSCF_DOMAIN = env("PCSCF_DOMAIN")
-ICSCF_DOMAIN = env("ICSCF_DOMAIN")
-SCSCF_DOMAIN = env("SCSCF_DOMAIN")
+PCSCF_DOMAIN = env_default("PCSCF_DOMAIN", f"pcscf.{IMS_DOMAIN}")
+ICSCF_DOMAIN = env_default("ICSCF_DOMAIN", f"icscf.{IMS_DOMAIN}")
+SCSCF_DOMAIN = env_default("SCSCF_DOMAIN", f"scscf.{IMS_DOMAIN}")
 SUBSCRIBER_IMSI = env("SUBSCRIBER_IMSI")
 SUBSCRIBER_MSISDN = env("SUBSCRIBER_MSISDN")
 IMS_AUTH_PASSWORD = env("IMS_AUTH_PASSWORD")
@@ -29,6 +33,11 @@ IMPI = f"{SUBSCRIBER_IMSI}@{IMS_DOMAIN}"
 IMPU = f"sip:{SUBSCRIBER_MSISDN}@{IMS_DOMAIN}"
 REGISTER_URI = f"sip:{IMS_DOMAIN}"
 CALL_ID = os.environ.get("SIP_CALL_ID", secrets.token_hex(8) + "@lain5g")
+EXPECTED_IMS_IP = env_default("SIP_EXPECTED_IMS_IP", "10.41.0.20")
+EXPECTED_PCSCF_IP = env_default("SIP_EXPECTED_PCSCF_IP", EXPECTED_IMS_IP)
+EXPECTED_ICSCF_IP = env_default("SIP_EXPECTED_ICSCF_IP", "10.41.0.21")
+EXPECTED_SCSCF_IP = env_default("SIP_EXPECTED_SCSCF_IP", "10.41.0.22")
+SIP_DNS_SERVER = os.environ.get("SIP_DNS_SERVER", "")
 
 
 def md5(value: str) -> str:
@@ -48,6 +57,56 @@ def resolve(name: str, expected: str | None = None) -> str:
             last_error = exc
             time.sleep(1)
     raise RuntimeError(f"DNS resolution failed for {name}: {last_error}")
+
+
+def resolve_via_dns_server(name: str, expected: str | None = None) -> str:
+    if not SIP_DNS_SERVER:
+        return resolve(name, expected)
+    query_id = secrets.token_bytes(2)
+    labels = b"".join(bytes([len(part)]) + part.encode("ascii") for part in name.rstrip(".").split(".")) + b"\x00"
+    query = query_id + b"\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00" + labels + b"\x00\x01\x00\x01"
+    last_error: Exception | None = None
+    for _ in range(30):
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.settimeout(2)
+            sock.sendto(query, (SIP_DNS_SERVER, 53))
+            data, _ = sock.recvfrom(512)
+            if data[:2] != query_id:
+                raise RuntimeError("DNS response id mismatch")
+            answer_count = int.from_bytes(data[6:8], "big")
+            offset = 12
+            while data[offset] != 0:
+                offset += data[offset] + 1
+            offset += 5
+            for _answer in range(answer_count):
+                if data[offset] & 0xC0 == 0xC0:
+                    offset += 2
+                else:
+                    while data[offset] != 0:
+                        offset += data[offset] + 1
+                    offset += 1
+                rtype = int.from_bytes(data[offset:offset + 2], "big")
+                rclass = int.from_bytes(data[offset + 2:offset + 4], "big")
+                rdlength = int.from_bytes(data[offset + 8:offset + 10], "big")
+                rdata = data[offset + 10:offset + 10 + rdlength]
+                offset += 10 + rdlength
+                if rtype == 1 and rclass == 1 and rdlength == 4:
+                    address = socket.inet_ntoa(rdata)
+                    if expected and address != expected:
+                        raise RuntimeError(f"unexpected address {address}, expected {expected}")
+                    print(f"SIP_CLIENT_DNS_RESOLVED {name}={address} server={SIP_DNS_SERVER}", flush=True)
+                    return address
+            raise RuntimeError("DNS A answer not found")
+        except Exception as exc:  # pragma: no cover - exercised in container
+            last_error = exc
+            time.sleep(1)
+        finally:
+            try:
+                sock.close()
+            except Exception:
+                pass
+    raise RuntimeError(f"DNS resolution failed for {name} via {SIP_DNS_SERVER}: {last_error}")
 
 
 def parse_code(message: str) -> int:
@@ -114,10 +173,10 @@ def receive(sock: socket.socket) -> str:
 
 
 def main() -> int:
-    resolve(IMS_DOMAIN, "10.41.0.20")
-    pcscf_ip = resolve(PCSCF_DOMAIN, "10.41.0.20")
-    resolve(ICSCF_DOMAIN, "10.41.0.21")
-    resolve(SCSCF_DOMAIN, "10.41.0.22")
+    resolve_via_dns_server(IMS_DOMAIN, EXPECTED_IMS_IP)
+    pcscf_ip = resolve_via_dns_server(PCSCF_DOMAIN, EXPECTED_PCSCF_IP)
+    resolve_via_dns_server(ICSCF_DOMAIN, EXPECTED_ICSCF_IP)
+    resolve_via_dns_server(SCSCF_DOMAIN, EXPECTED_SCSCF_IP)
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.settimeout(10)
