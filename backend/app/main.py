@@ -2,11 +2,12 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .api import deployments, health, runs, validation
+from .api import deployments, health, runs, subscribers, validation
 from .models.deployment import ErrorDetail, ErrorResponse
 from .services.command_service import CommandSecurityError
 from .services.deployment_service import DeploymentCommandError, DeploymentConflictError, DeploymentNotFoundError
 from .services.run_service import RunSecurityError
+from .services.subscriber_service import SubscriberServiceError
 from .settings import get_settings
 
 
@@ -22,13 +23,14 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_credentials=False,
-        allow_methods=["GET", "POST"],
+        allow_methods=["GET", "POST", "PATCH", "DELETE"],
         allow_headers=["*"],
     )
 
     app.include_router(health.router)
     app.include_router(deployments.router)
     app.include_router(runs.router)
+    app.include_router(subscribers.router)
     app.include_router(validation.router)
 
     register_exception_handlers(app)
@@ -60,6 +62,10 @@ def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(CommandSecurityError, bad_request_handler)
     app.add_exception_handler(RunSecurityError, bad_request_handler)
     app.add_exception_handler(ValueError, bad_request_handler)
+
+    @app.exception_handler(SubscriberServiceError)
+    async def subscriber_error_handler(request: Request, exc: SubscriberServiceError) -> JSONResponse:
+        return error_response(exc.status_code, exc.code, exc.message)
 
     @app.exception_handler(Exception)
     async def internal_error_handler(request: Request, exc: Exception) -> JSONResponse:
