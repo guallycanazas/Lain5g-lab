@@ -6,7 +6,7 @@ Lain5G-Lab no implementa un núcleo 4G/5G propio. Utiliza componentes externos y
 
 ## Estado actual
 
-La primera entrega se centra exclusivamente en 5G SA con Open5GS y UERANSIM desde terminal. VoLTE, VoNR, frontend, backend y RF quedan fuera de esta primera etapa hasta validar 5G SA con evidencia real.
+La primera entrega se centra en 5G SA con Open5GS y UERANSIM. El laboratorio puede operarse desde terminal y también desde una aplicación React + FastAPI dockerizada que reutiliza los mismos scripts validados.
 
 ## Uso inicial 5G SA
 
@@ -60,3 +60,20 @@ curl -X POST http://127.0.0.1:8000/api/deployments/5g-sa/stop
 ```
 
 Ver detalles en `docs/backend.md`.
+
+## Aplicación Web Dockerizada
+
+```bash
+cp .env.app.example .env.app
+make app-up
+```
+
+Antes de iniciar, edita `.env.app` y define `LAIN5G_PROJECT_ROOT` con la ruta absoluta del repositorio.
+
+Interfaz local:
+
+```text
+http://127.0.0.1:8080
+```
+
+Ver detalles en `docs/frontend.md` y `docs/dockerized_app.md`.
