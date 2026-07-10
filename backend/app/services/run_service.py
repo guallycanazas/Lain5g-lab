@@ -55,8 +55,8 @@ class RunService:
         metadata = self._read_json(run_dir / "metadata.json", required=True)
         if not isinstance(metadata, dict):
             return None
-        validation = self._read_json(run_dir / "validation.json", required=False)
-        metrics = self._read_json(run_dir / "metrics.json", required=False)
+        validation = self._read_optional_json(run_dir / "validation.json")
+        metrics = self._read_optional_json(run_dir / "metrics.json")
         return RunDetail(
             run_id=str(metadata.get("run_id", run_id)),
             metadata=metadata,
@@ -113,6 +113,12 @@ class RunService:
         with resolved.open("r", encoding="utf-8") as handle:
             value = json.load(handle)
         return value if isinstance(value, dict) else None
+
+    def _read_optional_json(self, path: Path) -> dict[str, Any] | None:
+        try:
+            return self._read_json(path, required=False)
+        except (OSError, ValueError, json.JSONDecodeError):
+            return None
 
     def _list_logs(self, run_dir: Path) -> list[str]:
         logs_dir = (run_dir / "logs").resolve()
