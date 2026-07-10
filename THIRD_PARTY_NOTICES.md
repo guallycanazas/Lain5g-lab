@@ -35,6 +35,18 @@ FastAPI está previsto para la etapa de backend posterior a la validación termi
 
 - Proyecto: https://fastapi.tiangolo.com/
 
+## PyMongo
+
+PyMongo se utiliza en el backend para acceder a MongoDB de Open5GS sin agregar una segunda capa de persistencia.
+
+- Proyecto: https://pymongo.readthedocs.io/
+
+## dnspython
+
+`dnspython` es una dependencia transitiva de PyMongo para resolución DNS.
+
+- Proyecto: https://www.dnspython.org/
+
 ## React
 
 React está previsto para la etapa de frontend posterior al backend.

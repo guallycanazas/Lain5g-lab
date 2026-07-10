@@ -19,6 +19,12 @@ LAIN5G_DRY_RUN=false
 LAIN5G_COMMAND_TIMEOUT=300
 LAIN5G_LOG_TAIL_LINES=500
 LAIN5G_CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+LAIN5G_OPEN5GS_MONGO_URI=mongodb://mongo:27017/open5gs
+LAIN5G_OPEN5GS_MONGO_DATABASE=open5gs
+LAIN5G_OPEN5GS_SUBSCRIBER_COLLECTION=subscribers
+LAIN5G_SUBSCRIBER_SECRETS_VISIBLE=false
+LAIN5G_SUBSCRIBER_OPERATION_TIMEOUT=15
+LAIN5G_OPEN5GS_DOCKER_NETWORK=lain5g-lab-5g-sa-core
 ```
 
 `backend/.env` no debe versionarse.
@@ -52,6 +58,14 @@ El backend no inicia Docker al arrancar.
 - `GET /api/runs/latest`
 - `GET /api/runs/{run_id}`
 - `GET /api/validation/latest`
+- `GET /api/subscribers/connection`
+- `GET /api/subscribers`
+- `GET /api/subscribers/{imsi}`
+- `POST /api/subscribers/validate`
+- `POST /api/subscribers`
+- `PATCH /api/subscribers/{imsi}`
+- `POST /api/subscribers/{imsi}/clone`
+- `DELETE /api/subscribers/{imsi}`
 
 ## Ejemplos curl
 
@@ -64,6 +78,8 @@ curl -X POST http://127.0.0.1:8000/api/deployments/5g-sa/validate
 curl http://127.0.0.1:8000/api/runs/latest
 curl http://127.0.0.1:8000/api/deployments/5g-sa/logs?tail=200
 curl -X POST http://127.0.0.1:8000/api/deployments/5g-sa/stop
+curl http://127.0.0.1:8000/api/subscribers/connection
+curl http://127.0.0.1:8000/api/subscribers
 ```
 
 ## Modo dry-run
@@ -103,6 +119,7 @@ Ejemplo:
 - Se rechazan enlaces simbólicos que resuelvan fuera del proyecto.
 - No se devuelven variables de entorno completas.
 - Se redactan valores asociados a `SUBSCRIBER_KEY`, `SUBSCRIBER_OPC`, `SUBSCRIBER_OP`, `K`, `KI`, `OP` y `OPC`.
+- Los endpoints de suscriptores no devuelven K, OP ni OPc completos; solo indicadores redactados.
 - `runs/` se lee sin permitir path traversal ni archivos arbitrarios.
 
 ## Estructura

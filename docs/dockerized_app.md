@@ -91,3 +91,20 @@ deployments/5g-sa/scripts/validate.sh
 ```
 
 El stack de aplicación vive en `docker-compose.app.yml`. El stack operativo 5G SA sigue viviendo en `deployments/5g-sa/docker-compose.yml`.
+
+## Gestión de Suscriptores
+
+El backend usa `pymongo` para acceder al MongoDB de Open5GS cuando el laboratorio está activo. La app no depende de MongoDB para arrancar: si 5G SA está detenido, `/api/subscribers/connection` devuelve `disconnected` o `timeout` y el resto de la aplicación sigue funcionando.
+
+La conexión se controla con:
+
+```env
+LAIN5G_OPEN5GS_MONGO_URI=mongodb://mongo:27017/open5gs
+LAIN5G_OPEN5GS_MONGO_DATABASE=open5gs
+LAIN5G_OPEN5GS_SUBSCRIBER_COLLECTION=subscribers
+LAIN5G_OPEN5GS_DOCKER_NETWORK=lain5g-lab-5g-sa-core
+```
+
+El backend solo intenta unirse a la red Docker 5G SA cuando el contenedor MongoDB está en ejecución, para no reservar direcciones IP de la red antes del arranque del laboratorio.
+
+Ver `docs/subscribers.md`.

@@ -77,3 +77,13 @@ http://127.0.0.1:8080
 ```
 
 Ver detalles en `docs/frontend.md` y `docs/dockerized_app.md`.
+
+## Suscriptores Open5GS
+
+La aplicación web incluye gestión visual de suscriptores para el escenario 5G SA. Todas las operaciones pasan por FastAPI y se aplican sobre MongoDB de Open5GS; no se crea una base de datos paralela.
+
+```bash
+make subscribers-test
+```
+
+Ver detalles en `docs/subscribers.md`.
