@@ -122,10 +122,12 @@ services:
     networks: { epc: { ipv4_address: 10.41.0.21 } }
 
   scscf:
-    image: lain5g-lab/kamailio:local
+    image: lain5g-lab/ims-sip:local
     container_name: lain5g-lab-4g-volte-sim-scscf
-    command: ["-DD", "-E", "-f", "/etc/kamailio/kamailio.cfg"]
-    volumes: ["../common/ims/scscf/kamailio.cfg:/etc/kamailio/kamailio.cfg:ro"]
+    command: ["scscf_server.py"]
+    env_file: [../common/.env]
+    depends_on:
+      ims-provisioner: { condition: service_completed_successfully }
     networks: { epc: { ipv4_address: 10.41.0.22 } }
 
   dns:
@@ -142,8 +144,41 @@ services:
     container_name: lain5g-lab-4g-volte-sim-ims-provisioner
     env_file: [../common/.env]
     depends_on: [ims-database]
-    command: ["sh", "-lc", "sleep 10; echo IMS provisioning placeholder; true"]
+    command:
+      - sh
+      - -lc
+      - |
+        until mariadb --skip-ssl -h ims-database -uroot ims -e "SELECT 1" >/dev/null 2>&1; do sleep 1; done
+        mariadb --skip-ssl -h ims-database -uroot ims <<SQL
+        ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS auth_ha1 VARCHAR(32);
+        INSERT INTO subscribers (imsi, msisdn, impi, impu, domain_name, auth_ha1)
+        VALUES (
+          '$${SUBSCRIBER_IMSI}',
+          '$${SUBSCRIBER_MSISDN}',
+          '$${SUBSCRIBER_IMSI}@$${IMS_DOMAIN}',
+          'sip:$${SUBSCRIBER_MSISDN}@$${IMS_DOMAIN}',
+          '$${IMS_DOMAIN}',
+          MD5(CONCAT('$${SUBSCRIBER_IMSI}', '@', '$${IMS_DOMAIN}', ':', '$${IMS_DOMAIN}', ':', '$${IMS_AUTH_PASSWORD}'))
+        )
+        ON DUPLICATE KEY UPDATE
+          msisdn = VALUES(msisdn),
+          impi = VALUES(impi),
+          impu = VALUES(impu),
+          domain_name = VALUES(domain_name),
+          auth_ha1 = VALUES(auth_ha1);
+        SQL
     networks: { epc: { ipv4_address: 10.41.0.31 } }
+    restart: "no"
+
+  sip-register:
+    image: lain5g-lab/ims-sip:local
+    container_name: lain5g-lab-4g-volte-sim-sip-register
+    profiles: ["sip"]
+    command: ["sip_register_client.py"]
+    env_file: [../common/.env]
+    dns: [10.41.0.30]
+    depends_on: [dns, pcscf, icscf, scscf]
+    networks: { epc: { ipv4_address: 10.41.0.32 } }
     restart: "no"
 
   enb:

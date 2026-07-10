@@ -111,6 +111,7 @@ build-4g-volte-sim:
 	docker build -t lain5g-lab/srsran4g-sim:local images/srsran4g-sim
 	docker build -t lain5g-lab/kamailio:local images/kamailio
 	docker build -t lain5g-lab/ims-dns:local images/ims-dns
+	docker build -t lain5g-lab/ims-sip:local images/ims-sip
 
 start-4g-volte-sim:
 	@deployments/4g-volte/sim/scripts/start.sh
