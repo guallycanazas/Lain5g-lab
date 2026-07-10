@@ -6,6 +6,30 @@ if [ "$#" -eq 0 ]; then
   exit 64
 fi
 
+if [ -n "${FD_HSS_CONNECT_TO:-}" ] && [ -f /usr/local/etc/freeDiameter/mme.conf ]; then
+  FD_CONNECT_TO="$FD_HSS_CONNECT_TO" perl -0pi -e 's/ConnectPeer = "hss\.localdomain" \{ ConnectTo = "[^"]+"; No_TLS; \};/q(ConnectPeer = "hss.localdomain" { ConnectTo = ") . $ENV{FD_CONNECT_TO} . q("; No_TLS; };)/ge' /usr/local/etc/freeDiameter/mme.conf
+fi
+
+if [ -n "${FD_MME_CONNECT_TO:-}" ] && [ -f /usr/local/etc/freeDiameter/hss.conf ]; then
+  FD_CONNECT_TO="$FD_MME_CONNECT_TO" perl -0pi -e 's/ConnectPeer = "mme\.localdomain" \{ ConnectTo = "[^"]+"; No_TLS; \};/q(ConnectPeer = "mme.localdomain" { ConnectTo = ") . $ENV{FD_CONNECT_TO} . q("; No_TLS; };)/ge' /usr/local/etc/freeDiameter/hss.conf
+fi
+
+if [ -n "${FD_PCRF_CONNECT_TO:-}" ] && [ -f /usr/local/etc/freeDiameter/smf.conf ]; then
+  FD_CONNECT_TO="$FD_PCRF_CONNECT_TO" perl -0pi -e 's/ConnectPeer = "pcrf\.localdomain" \{ ConnectTo = "[^"]+"; No_TLS; \};/q(ConnectPeer = "pcrf.localdomain" { ConnectTo = ") . $ENV{FD_CONNECT_TO} . q("; No_TLS; };)/ge' /usr/local/etc/freeDiameter/smf.conf
+fi
+
+if [ -n "${FD_SMF_CONNECT_TO:-}" ] && [ -f /usr/local/etc/freeDiameter/pcrf.conf ]; then
+  FD_CONNECT_TO="$FD_SMF_CONNECT_TO" perl -0pi -e 's/ConnectPeer = "smf\.localdomain" \{ ConnectTo = "[^"]+"; No_TLS; \};/q(ConnectPeer = "smf.localdomain" { ConnectTo = ") . $ENV{FD_CONNECT_TO} . q("; No_TLS; };)/ge' /usr/local/etc/freeDiameter/pcrf.conf
+fi
+
+if [ -n "${FD_LISTEN_ON:-}" ]; then
+  for fd_conf in /usr/local/etc/freeDiameter/*.conf; do
+    [ -f "$fd_conf" ] || continue
+    perl -0pi -e 's/\\nListenOn = "[^"]+";//g' "$fd_conf"
+    printf '\nListenOn = "%s";\n' "$FD_LISTEN_ON" >> "$fd_conf"
+  done
+fi
+
 if [ "$(basename "$1")" = "open5gs-upfd" ]; then
   ue_subnet="${UE_SUBNET:-10.45.0.0/16}"
   ue_gateway="${UE_GATEWAY:-10.45.0.1}"

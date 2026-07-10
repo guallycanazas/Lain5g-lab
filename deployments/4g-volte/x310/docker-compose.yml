@@ -1,0 +1,140 @@
+name: lain5g-lab-4g-lte-x310
+
+services:
+  mongo:
+    image: mongo:7.0
+    container_name: lain5g-lab-4g-lte-x310-mongo
+    command: ["mongod", "--bind_ip_all"]
+    volumes: ["mongo-data:/data/db"]
+    networks: { epc: { ipv4_address: 10.42.0.2 } }
+
+  subscriber-provisioner:
+    image: mongo:7.0
+    container_name: lain5g-lab-4g-lte-x310-subscriber-provisioner
+    env_file: [../common/.env]
+    depends_on: [mongo]
+    volumes: ["../common/provisioning/open5gs-subscriber-init.js:/subscriber-init.js:ro"]
+    command: ["mongosh", "mongodb://mongo:27017/open5gs", "/subscriber-init.js"]
+    networks: { epc: { ipv4_address: 10.42.0.3 } }
+    restart: "no"
+
+  mme:
+    image: lain5g-lab/open5gs:local
+    container_name: lain5g-lab-4g-lte-x310-mme
+    command: ["open5gs-mmed", "-c", "/etc/open5gs/mme.yaml"]
+    volumes: ["../common/open5gs/mme.yaml:/etc/open5gs/mme.yaml:ro"]
+    networks: { epc: { ipv4_address: 10.42.0.10 } }
+
+  hss:
+    image: lain5g-lab/open5gs:local
+    container_name: lain5g-lab-4g-lte-x310-hss
+    command: ["open5gs-hssd", "-c", "/etc/open5gs/hss.yaml"]
+    depends_on: [subscriber-provisioner]
+    volumes: ["../common/open5gs/hss.yaml:/etc/open5gs/hss.yaml:ro"]
+    networks: { epc: { ipv4_address: 10.42.0.11 } }
+
+  sgwc:
+    image: lain5g-lab/open5gs:local
+    container_name: lain5g-lab-4g-lte-x310-sgwc
+    command: ["open5gs-sgwcd", "-c", "/etc/open5gs/sgwc.yaml"]
+    volumes: ["../common/open5gs/sgwc.yaml:/etc/open5gs/sgwc.yaml:ro"]
+    networks: { epc: { ipv4_address: 10.42.0.12 } }
+
+  sgwu:
+    image: lain5g-lab/open5gs:local
+    container_name: lain5g-lab-4g-lte-x310-sgwu
+    command: ["open5gs-sgwud", "-c", "/etc/open5gs/sgwu.yaml"]
+    volumes: ["../common/open5gs/sgwu.yaml:/etc/open5gs/sgwu.yaml:ro"]
+    networks: { epc: { ipv4_address: 10.42.0.13 } }
+
+  pgwc:
+    image: lain5g-lab/open5gs:local
+    container_name: lain5g-lab-4g-lte-x310-pgwc
+    command: ["open5gs-smfd", "-c", "/etc/open5gs/pgwc.yaml"]
+    volumes: ["../common/open5gs/pgwc.yaml:/etc/open5gs/pgwc.yaml:ro"]
+    networks: { epc: { ipv4_address: 10.42.0.14 } }
+
+  pgwu:
+    image: lain5g-lab/open5gs:local
+    container_name: lain5g-lab-4g-lte-x310-pgwu
+    command: ["open5gs-upfd", "-c", "/etc/open5gs/pgwu.yaml"]
+    cap_add: [NET_ADMIN]
+    devices: ["/dev/net/tun:/dev/net/tun"]
+    volumes: ["../common/open5gs/pgwu.yaml:/etc/open5gs/pgwu.yaml:ro"]
+    networks: { epc: { ipv4_address: 10.42.0.15 } }
+
+  pcrf:
+    image: lain5g-lab/open5gs:local
+    container_name: lain5g-lab-4g-lte-x310-pcrf
+    command: ["open5gs-pcrfd", "-c", "/etc/open5gs/pcrf.yaml"]
+    volumes: ["../common/open5gs/pcrf.yaml:/etc/open5gs/pcrf.yaml:ro"]
+    networks: { epc: { ipv4_address: 10.42.0.16 } }
+
+  ims-database:
+    image: mariadb:11
+    container_name: lain5g-lab-4g-lte-x310-ims-database
+    environment: { MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "yes", MARIADB_DATABASE: ims }
+    volumes: ["../common/ims/database/init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro"]
+    networks: { epc: { ipv4_address: 10.42.0.19 } }
+
+  pcscf:
+    image: lain5g-lab/kamailio:local
+    container_name: lain5g-lab-4g-lte-x310-pcscf
+    command: ["-DD", "-E", "-f", "/etc/kamailio/kamailio.cfg"]
+    volumes: ["../common/ims/pcscf/kamailio.cfg:/etc/kamailio/kamailio.cfg:ro"]
+    networks: { epc: { ipv4_address: 10.42.0.20 } }
+
+  icscf:
+    image: lain5g-lab/kamailio:local
+    container_name: lain5g-lab-4g-lte-x310-icscf
+    command: ["-DD", "-E", "-f", "/etc/kamailio/kamailio.cfg"]
+    volumes: ["../common/ims/icscf/kamailio.cfg:/etc/kamailio/kamailio.cfg:ro"]
+    networks: { epc: { ipv4_address: 10.42.0.21 } }
+
+  scscf:
+    image: lain5g-lab/kamailio:local
+    container_name: lain5g-lab-4g-lte-x310-scscf
+    command: ["-DD", "-E", "-f", "/etc/kamailio/kamailio.cfg"]
+    volumes: ["../common/ims/scscf/kamailio.cfg:/etc/kamailio/kamailio.cfg:ro"]
+    networks: { epc: { ipv4_address: 10.42.0.22 } }
+
+  dns:
+    image: lain5g-lab/ims-dns:local
+    container_name: lain5g-lab-4g-lte-x310-dns
+    command: ["-conf", "/etc/coredns/Corefile"]
+    volumes:
+      - ../common/ims/dns/Corefile:/etc/coredns/Corefile:ro
+      - ../common/ims/dns/ims.hosts:/etc/coredns/ims.hosts:ro
+    networks: { epc: { ipv4_address: 10.42.0.30 } }
+
+  ims-provisioner:
+    image: mariadb:11
+    container_name: lain5g-lab-4g-lte-x310-ims-provisioner
+    env_file: [../common/.env]
+    depends_on: [ims-database]
+    command: ["sh", "-lc", "sleep 10; echo IMS provisioning placeholder; true"]
+    networks: { epc: { ipv4_address: 10.42.0.31 } }
+    restart: "no"
+
+  enb-x310:
+    image: lain5g-lab/srsran4g-uhd:local
+    container_name: lain5g-lab-4g-lte-x310-enb
+    profiles: ["rf"]
+    network_mode: host
+    command: ["srsenb", "/etc/srsran/enb.conf", "--enb_files.rr_config=/etc/srsran/rr.conf", "--enb_files.sib_config=/etc/srsran/sib.conf"]
+    volumes:
+      - ./ran/enb.conf:/etc/srsran/enb.conf:ro
+      - ./ran/rr.conf:/etc/srsran/rr.conf:ro
+      - ./ran/sib.conf:/etc/srsran/sib.conf:ro
+
+networks:
+  epc:
+    name: lain5g-lab-4g-lte-x310-core
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.42.0.0/24
+
+volumes:
+  mongo-data:
+    name: lain5g-lab-4g-lte-x310-mongo-data

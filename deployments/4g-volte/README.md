@@ -1,5 +1,41 @@
-# 4G LTE con VoLTE
+# 4G LTE, IMS y Preparación VoLTE
 
-Este escenario se implementará después de validar completamente 5G SA desde terminal, incluyendo registro UE, sesión PDU, interfaz TUN, IP asignada y ping exitoso.
+Este escenario contiene dos perfiles independientes:
 
-No se declara soporte VoLTE hasta comprobar señalización SIP completa y RTP bidireccional.
+- `4g-volte-sim`: ruta software con EPC, IMS, srsENB y srsUE.
+- `4g-lte-x310`: ruta RF controlada con EPC, IMS y srsENB para USRP X310.
+
+La ruta RF no se inicia automáticamente y exige preflight, manifiesto de seguridad y `LAIN5G_ALLOW_RF_START=true`.
+
+No se afirma llamada VoLTE completa hasta contar con señalización SIP completa y RTP bidireccional.
+
+## Preparación
+
+```bash
+cp deployments/4g-volte/common/.env.example deployments/4g-volte/common/.env
+```
+
+Edita `deployments/4g-volte/common/.env` y usa claves de laboratorio, nunca credenciales reales.
+
+## Simulación Software
+
+```bash
+make build-4g-volte-sim
+make start-4g-volte-sim
+make validate-4g-volte-sim
+make stop-4g-volte-sim
+```
+
+## X310 Sin RF
+
+```bash
+make build-4g-lte-x310
+make check-x310
+make preflight-4g-lte-x310
+make start-4g-lte-x310-epc
+make stop-4g-lte-x310
+```
+
+## X310 Con RF
+
+La RF requiere `safety-manifest.yaml`, `channel-plan.yaml`, `LAIN5G_ALLOW_RF_START=true`, autorización real y duración finita. Ver `docs/rf_safety.md` antes de usar `make start-4g-lte-x310-rf`.

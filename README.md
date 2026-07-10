@@ -6,7 +6,9 @@ Lain5G-Lab no implementa un núcleo 4G/5G propio. Utiliza componentes externos y
 
 ## Estado actual
 
-La primera entrega se centra en 5G SA con Open5GS y UERANSIM. El laboratorio puede operarse desde terminal y también desde una aplicación React + FastAPI dockerizada que reutiliza los mismos scripts validados.
+La entrega estable principal se centra en 5G SA con Open5GS y UERANSIM. El laboratorio puede operarse desde terminal y también desde una aplicación React + FastAPI dockerizada que reutiliza los mismos scripts validados.
+
+La rama de trabajo actual agrega preparación 4G LTE/IMS con dos perfiles: simulación software y ruta X310 con RF bloqueada por defecto. 4G todavía no está integrado en API/frontend.
 
 ## Uso inicial 5G SA
 
@@ -36,8 +38,20 @@ Estos archivos son permanentes y no se generan automáticamente.
 ## Escenarios
 
 - `deployments/5g-sa`: objetivo inicial.
-- `deployments/4g-volte`: reservado para una etapa posterior.
+- `deployments/4g-volte`: EPC/IMS 4G, simulación software y ruta X310 controlada.
 - `deployments/5g-vonr`: reservado para una etapa posterior.
+
+## Uso 4G LTE/IMS
+
+```bash
+cp deployments/4g-volte/common/.env.example deployments/4g-volte/common/.env
+make build-4g-volte-sim
+make start-4g-volte-sim
+make validate-4g-volte-sim
+make stop-4g-volte-sim
+```
+
+La ruta X310 requiere autorización RF explícita y está documentada en `docs/x310_lte.md` y `docs/rf_safety.md`.
 
 ## Backend FastAPI
 
@@ -87,3 +101,12 @@ make subscribers-test
 ```
 
 Ver detalles en `docs/subscribers.md`.
+
+## Documentación 4G
+
+- `docs/4g_volte.md`.
+- `docs/4g_simulation.md`.
+- `docs/x310_lte.md`.
+- `docs/rf_safety.md`.
+- `docs/ims.md`.
+- `docs/volte_validation.md`.

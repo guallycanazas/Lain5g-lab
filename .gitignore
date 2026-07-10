@@ -1,5 +1,8 @@
 .env
 .env.app
+deployments/4g-volte/common/.env
+deployments/4g-volte/x310/rf/channel-plan.yaml
+deployments/4g-volte/x310/rf/safety-manifest.yaml
 backend/.env
 frontend/.env
 frontend/.env.local
