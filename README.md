@@ -38,3 +38,25 @@ Estos archivos son permanentes y no se generan automáticamente.
 - `deployments/5g-sa`: objetivo inicial.
 - `deployments/4g-volte`: reservado para una etapa posterior.
 - `deployments/5g-vonr`: reservado para una etapa posterior.
+
+## Backend FastAPI
+
+El backend mínimo administra el despliegue 5G SA reutilizando los scripts validados en `deployments/5g-sa/scripts/`.
+
+```bash
+make backend-install
+make backend-test
+make backend-dev
+```
+
+API local:
+
+```bash
+curl http://127.0.0.1:8000/api/health
+curl http://127.0.0.1:8000/api/deployments
+curl -X POST http://127.0.0.1:8000/api/deployments/5g-sa/start
+curl -X POST http://127.0.0.1:8000/api/deployments/5g-sa/validate
+curl -X POST http://127.0.0.1:8000/api/deployments/5g-sa/stop
+```
+
+Ver detalles en `docs/backend.md`.
