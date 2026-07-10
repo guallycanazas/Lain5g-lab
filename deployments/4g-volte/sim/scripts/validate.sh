@@ -8,7 +8,7 @@ claims=()
 add_check(){ checks+=("$1|$2|$3"); printf '%-24s %s %s\n' "$1" "$2" "$3"; }
 compose(){ (cd "$scenario_dir" && docker compose --env-file ../common/.env -f docker-compose.yml "$@"); }
 running(){ [ -n "$(compose ps --status running -q "$1" 2>/dev/null)" ]; }
-logs_have(){ compose logs --no-color "$1" 2>/dev/null | grep -Eiq "$2"; }
+logs_have(){ local output; output="$(compose logs --no-color "$1" 2>/dev/null || true)"; grep -Eiq "$2" <<< "$output"; }
 container_file_have(){ compose exec -T "$1" sh -lc 'grep -Eiq "$1" "$2"' sh "$3" "$2" 2>/dev/null; }
 ims_subscriber_provisioned(){ compose exec -T ims-database mariadb --skip-ssl -uroot -N -B ims -e "SELECT COUNT(*) FROM subscribers WHERE imsi = '$SUBSCRIBER_IMSI' AND impi = '$SUBSCRIBER_IMSI@$IMS_DOMAIN' AND impu = 'sip:$SUBSCRIBER_MSISDN@$IMS_DOMAIN' AND domain_name = '$IMS_DOMAIN' AND auth_ha1 REGEXP '^[0-9a-f]{32}$';" 2>/dev/null | grep -qx 1; }
 ims_dns_resolves(){ compose run --rm --no-deps --entrypoint python3 sip-register -c 'import socket, sys; expected={"ims.mnc001.mcc001.3gppnetwork.org":"10.41.0.20","pcscf.ims.mnc001.mcc001.3gppnetwork.org":"10.41.0.20","icscf.ims.mnc001.mcc001.3gppnetwork.org":"10.41.0.21","scscf.ims.mnc001.mcc001.3gppnetwork.org":"10.41.0.22"}; sys.exit(0 if all(socket.gethostbyname(name) == ip for name, ip in expected.items()) else 1)' >/dev/null 2>&1; }
@@ -19,6 +19,10 @@ if [ -f "$env_file" ]; then
   . "$env_file"
   set +a
 fi
+
+latest="$(find "$repo_dir/runs" -mindepth 1 -maxdepth 1 -type d -name 'run-*' | sort | tail -n 1 || true)"
+[ -n "$latest" ] || { latest="$repo_dir/runs/run-$(date -u +%Y%m%d-%H%M%S)"; mkdir -p "$latest/logs"; }
+mkdir -p "$latest/logs"
 
 if [ "${LAIN5G_DRY_RUN:-false}" = "true" ]; then
   for id in mongo mme hss sgwc sgwu pgwc pgwu pcrf s1_setup ue_registration default_bearer ue_ip ue_tun data_ping ims_database ims_subscriber pcscf icscf scscf ims_dns ims_apn sip_register; do add_check "$id" NOT_TESTED "dry-run mode"; done
@@ -35,10 +39,11 @@ else
   for svc in pcscf icscf scscf; do running "$svc" && add_check "$svc" PASS "container is running" || add_check "$svc" FAIL "container is not running"; done
   running dns && ims_dns_resolves && { add_check ims_dns PASS "IMS DNS resolved"; claims+=("IMS DNS resolved"); } || add_check ims_dns FAIL "IMS DNS not resolved"
   add_check ims_apn PASS "IMS APN provisioned in subscriber document"
-  if logs_have sip-register 'SIP_CLIENT_INITIAL_REGISTER_SENT' && logs_have sip-register 'SIP_CLIENT_CHALLENGE_RECEIVED code=401' && logs_have sip-register 'SIP_CLIENT_AUTH_REGISTER_SENT' && logs_have sip-register 'SIP_CLIENT_FINAL_RESPONSE code=200' && logs_have sip-register 'SIP_REGISTER_RESULT=PASS final_code=200' && logs_have pcscf 'P-CSCF_FORWARD_REGISTER' && logs_have icscf 'I-CSCF_FORWARD_REGISTER' && logs_have scscf 'SCSCF_INITIAL_REGISTER' && logs_have scscf 'SCSCF_SENT_401_UNAUTHORIZED' && logs_have scscf 'SCSCF_AUTH_REGISTER' && logs_have scscf 'SCSCF_SENT_200_OK'; then
+  compose run --rm --no-deps sip-register >"$latest/logs/sip-register-run.log" 2>&1 || true
+  if grep -Eiq 'SIP_CLIENT_INITIAL_REGISTER_SENT' "$latest/logs/sip-register-run.log" && grep -Eiq 'SIP_CLIENT_CHALLENGE_RECEIVED code=401' "$latest/logs/sip-register-run.log" && grep -Eiq 'SIP_CLIENT_AUTH_REGISTER_SENT' "$latest/logs/sip-register-run.log" && grep -Eiq 'SIP_CLIENT_FINAL_RESPONSE code=200' "$latest/logs/sip-register-run.log" && grep -Eiq 'SIP_REGISTER_RESULT=PASS final_code=200' "$latest/logs/sip-register-run.log" && logs_have pcscf 'P-CSCF_FORWARD_REGISTER' && logs_have icscf 'I-CSCF_FORWARD_REGISTER' && logs_have scscf 'SCSCF_INITIAL_REGISTER' && logs_have scscf 'SCSCF_SENT_401_UNAUTHORIZED' && logs_have scscf 'SCSCF_AUTH_REGISTER' && logs_have scscf 'SCSCF_SENT_200_OK'; then
     add_check sip_register PASS "SIP REGISTER challenge and final 200 OK observed"
     claims+=("SIP REGISTER succeeded")
-  elif logs_have sip-register 'SIP_CLIENT_INITIAL_REGISTER_SENT|SIP_REGISTER_RESULT=FAIL'; then
+  elif grep -Eiq 'SIP_CLIENT_INITIAL_REGISTER_SENT|SIP_REGISTER_RESULT=FAIL' "$latest/logs/sip-register-run.log"; then
     add_check sip_register FAIL "SIP REGISTER attempted but did not complete successfully"
   else
     add_check sip_register NOT_TESTED "no SIP REGISTER client evidence"
@@ -60,8 +65,6 @@ for check in "${checks[@]}"; do
       ;;
   esac
 done
-latest="$(find "$repo_dir/runs" -mindepth 1 -maxdepth 1 -type d -name 'run-*' | sort | tail -n 1 || true)"
-[ -n "$latest" ] || { latest="$repo_dir/runs/run-$(date -u +%Y%m%d-%H%M%S)"; mkdir -p "$latest/logs"; }
 {
   printf '{"scenario":"4g-volte-sim","status":"%s","checked_at":"%s","checks":[' "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   for i in "${!checks[@]}"; do
