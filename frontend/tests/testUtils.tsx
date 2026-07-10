@@ -23,6 +23,7 @@ export function renderRoute(path: string, element: ReactElement, route = path) {
       <MemoryRouter initialEntries={[route]}>
         <Routes>
           <Route path={path} element={element} />
+          <Route path="/subscribers/:imsi" element={<div>subscriber-detail</div>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -81,4 +82,37 @@ export const runSummary = {
   status: 'stopped',
   git_commit: 'abc1234',
   validated_claims: ['UE registered'],
+};
+
+export const subscriberConnection = {
+  status: 'connected',
+  database: 'open5gs',
+  collection: 'subscribers',
+  server: 'mongo:27017',
+  latency_ms: 4,
+  checked_at: '2026-07-10T02:00:00Z',
+};
+
+export const subscriberDetail = {
+  imsi: '001010000000001',
+  msisdn: '51999999999',
+  dnn: 'internet',
+  sst: 1,
+  sd: '000001',
+  security: {
+    k_configured: true,
+    op_configured: false,
+    opc_configured: true,
+    amf: '8000',
+    sqn: '************',
+  },
+  checked_at: '2026-07-10T02:00:00Z',
+  note: 'La existencia del suscriptor en Open5GS no demuestra que el UE se haya autenticado.',
+};
+
+export const subscriberList = {
+  items: [subscriberDetail],
+  total: 1,
+  limit: 25,
+  offset: 0,
 };
