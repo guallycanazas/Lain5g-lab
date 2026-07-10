@@ -2,11 +2,12 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .api import deployments, health, runs, validation
+from .api import deployments, health, profiles, runs, subscribers, validation
 from .models.deployment import ErrorDetail, ErrorResponse
 from .services.command_service import CommandSecurityError
 from .services.deployment_service import DeploymentCommandError, DeploymentConflictError, DeploymentNotFoundError
 from .services.run_service import RunSecurityError
+from .services.subscriber_service import SubscriberServiceError
 from .settings import get_settings
 
 
@@ -22,21 +23,23 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_credentials=False,
-        allow_methods=["GET", "POST"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["*"],
     )
 
     app.include_router(health.router)
     app.include_router(deployments.router)
     app.include_router(runs.router)
+    app.include_router(subscribers.router)
+    app.include_router(profiles.router)
     app.include_router(validation.router)
 
     register_exception_handlers(app)
     return app
 
 
-def error_response(status_code: int, code: str, message: str, *, exit_code: int | None = None, stderr: str | None = None) -> JSONResponse:
-    body = ErrorResponse(detail=ErrorDetail(code=code, message=message, exit_code=exit_code, stderr=stderr))
+def error_response(status_code: int, code: str, message: str, *, exit_code: int | None = None, stderr: str | None = None, active_scenario: str | None = None) -> JSONResponse:
+    body = ErrorResponse(detail=ErrorDetail(code=code, message=message, exit_code=exit_code, stderr=stderr, active_scenario=active_scenario))
     return JSONResponse(status_code=status_code, content=body.model_dump())
 
 
@@ -47,7 +50,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(DeploymentConflictError)
     async def deployment_conflict_handler(request: Request, exc: DeploymentConflictError) -> JSONResponse:
-        return error_response(409, "DEPLOYMENT_CONFLICT", str(exc))
+        return error_response(409, "DEPLOYMENT_CONFLICT", str(exc), active_scenario=getattr(exc, "active_scenario", None))
 
     @app.exception_handler(DeploymentCommandError)
     async def deployment_command_handler(request: Request, exc: DeploymentCommandError) -> JSONResponse:
@@ -60,6 +63,16 @@ def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(CommandSecurityError, bad_request_handler)
     app.add_exception_handler(RunSecurityError, bad_request_handler)
     app.add_exception_handler(ValueError, bad_request_handler)
+
+    @app.exception_handler(SubscriberServiceError)
+    async def subscriber_error_handler(request: Request, exc: SubscriberServiceError) -> JSONResponse:
+        return error_response(exc.status_code, exc.code, exc.message)
+
+    from .services.profile_config_service import ProfileConfigError
+
+    @app.exception_handler(ProfileConfigError)
+    async def profile_config_error_handler(request: Request, exc: ProfileConfigError) -> JSONResponse:
+        return error_response(exc.status_code, exc.code, exc.message)
 
     @app.exception_handler(Exception)
     async def internal_error_handler(request: Request, exc: Exception) -> JSONResponse:

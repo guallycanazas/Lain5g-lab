@@ -35,6 +35,18 @@ FastAPI está previsto para la etapa de backend posterior a la validación termi
 
 - Proyecto: https://fastapi.tiangolo.com/
 
+## PyMongo
+
+PyMongo se utiliza en el backend para acceder a MongoDB de Open5GS sin agregar una segunda capa de persistencia.
+
+- Proyecto: https://pymongo.readthedocs.io/
+
+## dnspython
+
+`dnspython` es una dependencia transitiva de PyMongo para resolución DNS.
+
+- Proyecto: https://www.dnspython.org/
+
 ## React
 
 React está previsto para la etapa de frontend posterior al backend.
@@ -43,15 +55,27 @@ React está previsto para la etapa de frontend posterior al backend.
 
 ## Kamailio
 
-Kamailio se considerará cuando se implemente IMS para VoLTE/VoNR. No forma parte de la primera entrega 5G SA.
+Kamailio se utiliza para los servicios IMS mínimos del escenario 4G LTE/IMS.
 
 - Proyecto: https://www.kamailio.org/
 
 ## srsRAN
 
-srsRAN se considerará solo en etapas futuras. No se implementa RF ni transmisión radio en esta versión.
+srsRAN 4G se utiliza para la ruta LTE software y para la preparación eNB X310. La ruta RF está bloqueada por defecto y requiere autorización explícita.
 
 - Proyecto: https://www.srsran.com/
+
+## UHD
+
+UHD se utiliza en la imagen X310 para comunicación con USRP. Lain5G-Lab no actualiza firmware ni FPGA automáticamente.
+
+- Proyecto: https://github.com/EttusResearch/uhd
+
+## CoreDNS
+
+CoreDNS se utiliza como DNS IMS de laboratorio en el escenario 4G.
+
+- Proyecto: https://coredns.io/
 
 ## herlesupreeth/docker_open5gs
 

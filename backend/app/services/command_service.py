@@ -35,6 +35,10 @@ class CommandService:
         script_path = self._resolve_inside_project(script)
         cwd_path = self._resolve_inside_project(cwd or ".")
         command = [str(script_path), *(args or [])]
+        effective_dry_run = self.settings.dry_run if dry_run is None else dry_run
+
+        if effective_dry_run:
+            return self._run(command, cwd_path, dry_run=True)
 
         if not script_path.exists():
             return self._synthetic_result(command, cwd_path, 127, "", f"Script not found: {self._display_path(script_path)}", dry_run=False)
@@ -43,7 +47,7 @@ class CommandService:
         if not os.access(script_path, os.X_OK):
             return self._synthetic_result(command, cwd_path, 126, "", "Command is not executable", dry_run=False)
 
-        return self._run(command, cwd_path, dry_run=self.settings.dry_run if dry_run is None else dry_run)
+        return self._run(command, cwd_path, dry_run=False)
 
     def execute_command(
         self,

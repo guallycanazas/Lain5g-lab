@@ -6,7 +6,9 @@ Lain5G-Lab no implementa un núcleo 4G/5G propio. Utiliza componentes externos y
 
 ## Estado actual
 
-La primera entrega se centra exclusivamente en 5G SA con Open5GS y UERANSIM desde terminal. VoLTE, VoNR, frontend, backend y RF quedan fuera de esta primera etapa hasta validar 5G SA con evidencia real.
+La entrega estable principal se centra en 5G SA con Open5GS y UERANSIM. El laboratorio puede operarse desde terminal y también desde una aplicación React + FastAPI dockerizada que reutiliza los mismos scripts validados.
+
+La rama de trabajo actual agrega preparación 4G LTE/IMS con dos perfiles: simulación software y ruta X310 con RF bloqueada por defecto. 4G todavía no está integrado en API/frontend.
 
 ## Uso inicial 5G SA
 
@@ -36,8 +38,20 @@ Estos archivos son permanentes y no se generan automáticamente.
 ## Escenarios
 
 - `deployments/5g-sa`: objetivo inicial.
-- `deployments/4g-volte`: reservado para una etapa posterior.
+- `deployments/4g-volte`: EPC/IMS 4G, simulación software y ruta X310 controlada.
 - `deployments/5g-vonr`: reservado para una etapa posterior.
+
+## Uso 4G LTE/IMS
+
+```bash
+cp deployments/4g-volte/common/.env.example deployments/4g-volte/common/.env
+make build-4g-volte-sim
+make start-4g-volte-sim
+make validate-4g-volte-sim
+make stop-4g-volte-sim
+```
+
+La ruta X310 requiere autorización RF explícita y está documentada en `docs/x310_lte.md` y `docs/rf_safety.md`.
 
 ## Backend FastAPI
 
@@ -60,3 +74,39 @@ curl -X POST http://127.0.0.1:8000/api/deployments/5g-sa/stop
 ```
 
 Ver detalles en `docs/backend.md`.
+
+## Aplicación Web Dockerizada
+
+```bash
+cp .env.app.example .env.app
+make app-up
+```
+
+Antes de iniciar, edita `.env.app` y define `LAIN5G_PROJECT_ROOT` con la ruta absoluta del repositorio.
+
+Interfaz local:
+
+```text
+http://127.0.0.1:8080
+```
+
+Ver detalles en `docs/frontend.md` y `docs/dockerized_app.md`.
+
+## Suscriptores Open5GS
+
+La aplicación web incluye gestión visual de suscriptores para el escenario 5G SA. Todas las operaciones pasan por FastAPI y se aplican sobre MongoDB de Open5GS; no se crea una base de datos paralela.
+
+```bash
+make subscribers-test
+```
+
+Ver detalles en `docs/subscribers.md`.
+
+## Documentación 4G
+
+- `docs/4g_volte.md`.
+- `docs/4g_simulation.md`.
+- `docs/x310_lte.md`.
+- `docs/rf_safety.md`.
+- `docs/ims.md`.
+- `docs/volte_validation.md`.

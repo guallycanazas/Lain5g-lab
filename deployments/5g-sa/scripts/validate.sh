@@ -34,7 +34,9 @@ is_running() {
 logs_have() {
   local service="$1"
   local pattern="$2"
-  compose logs --no-color "$service" 2>/dev/null | grep -Eiq "$pattern"
+  local output
+  output="$(compose logs --no-color "$service" 2>/dev/null || true)"
+  grep -Eiq "$pattern" <<< "$output"
 }
 
 run_exec() {
@@ -44,7 +46,7 @@ run_exec() {
 }
 
 if [ "${LAIN5G_DRY_RUN:-false}" = "true" ]; then
-  for id in mongo nrf amf smf upf ausf udm udr pcf ng_connection ue_registration pdu_session ue_tun ue_ip ping; do
+  for id in mongo nrf amf smf upf ausf udm udr pcf ng_setup ue_registration pdu_session ue_tun ue_ip ping; do
     add_check "$id" "NOT_TESTED" "dry-run mode"
   done
 else
@@ -63,15 +65,15 @@ else
   done
 
   if logs_have gnb 'NG Setup procedure is successful|NG Setup.*successful|NG-Setup.*successful'; then
-    add_check "ng_connection" "PASS" "gNB reports successful NG setup"
+    add_check "ng_setup" "PASS" "gNB reports successful NG setup"
     validated_claims+=("gNB connected to AMF")
   elif is_running gnb; then
-    add_check "ng_connection" "WARNING" "gNB is running but NG setup evidence was not found"
+    add_check "ng_setup" "WARNING" "gNB is running but NG setup evidence was not found"
   else
-    add_check "ng_connection" "FAIL" "gNB is not running"
+    add_check "ng_setup" "FAIL" "gNB is not running"
   fi
 
-  if logs_have ue 'Registration is successful|Registration.*successful|5GMM.*Registered'; then
+  if logs_have ue 'Initial Registration is successful|Registration is successful|Registration.*successful|5GMM.*Registered'; then
     add_check "ue_registration" "PASS" "UE registration evidence found"
     validated_claims+=("UE registered")
   elif is_running ue; then

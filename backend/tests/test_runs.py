@@ -10,10 +10,11 @@ def test_list_runs_orders_descending(run_service):
 
 
 def test_list_runs_filters(run_service):
-    runs = run_service.list_runs(limit=1, scenario="5g-sa", status="stopped")
+    runs = run_service.list_runs(limit=1, scenario="5g-sa", status="PASS")
 
     assert len(runs) == 1
     assert runs[0].run_id == "run-valid"
+    assert runs[0].status == "PASS"
 
 
 def test_get_run_reads_metadata_validation_metrics_and_logs(run_service):

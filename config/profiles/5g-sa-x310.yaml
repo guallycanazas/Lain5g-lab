@@ -1,0 +1,31 @@
+profile: 5g-sa-x310
+
+network:
+  mcc: "001"
+  mnc: "01"
+  tac: 1
+  dnn: internet
+  slice:
+    sst: 1
+    sd: "000001"
+
+core:
+  amf_addr: ""
+  gnb_bind_addr: ""
+  n3_bind_addr: ""
+
+radio:
+  device: x310
+  usrp_addr: "192.168.10.2"
+  band: null
+  dl_arfcn: null
+  bandwidth_mhz: 10
+  tx_gain: null
+  rx_gain: null
+  clock_source: internal
+  time_source: internal
+
+safety:
+  maximum_duration_seconds: 60
+  rf_allowed: false
+  environment: cabled

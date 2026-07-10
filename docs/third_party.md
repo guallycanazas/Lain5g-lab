@@ -10,6 +10,8 @@ Componentes externos reconocidos:
 - Docker.
 - FastAPI, previsto para backend futuro.
 - React, previsto para frontend futuro.
-- Kamailio, previsto para IMS futuro.
-- srsRAN, previsto solo para etapas futuras sin RF inicial.
+- Kamailio, usado para IMS mínimo en 4G.
+- srsRAN 4G, usado para simulación LTE y preparación X310.
+- UHD, usado por la imagen X310 sin actualización automática de FPGA.
+- CoreDNS, usado como DNS IMS de laboratorio.
 - `herlesupreeth/docker_open5gs`, reconocido como referencia metodológica, no como base copiada.
