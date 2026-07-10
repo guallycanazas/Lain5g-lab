@@ -1,0 +1,57 @@
+FROM ubuntu:22.04
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG OPEN5GS_VERSION=v2.7.5
+ARG OPEN5GS_COMMIT=
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        bash \
+        bison \
+        build-essential \
+        ca-certificates \
+        curl \
+        flex \
+        git \
+        iproute2 \
+        iptables \
+        iputils-ping \
+        libbson-dev \
+        libcurl4-gnutls-dev \
+        libgcrypt20-dev \
+        libgnutls28-dev \
+        libidn11-dev \
+        libmicrohttpd-dev \
+        libmongoc-dev \
+        libnghttp2-dev \
+        libssl-dev \
+        libsctp-dev \
+        libtalloc-dev \
+        libyaml-dev \
+        meson \
+        netbase \
+        ninja-build \
+        pkg-config \
+        tcpdump \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt
+
+RUN git clone --depth 1 --branch "${OPEN5GS_VERSION}" https://github.com/open5gs/open5gs.git open5gs \
+    && cd open5gs \
+    && if [ -n "${OPEN5GS_COMMIT}" ]; then \
+        git fetch --depth 1 origin "${OPEN5GS_COMMIT}" && git checkout "${OPEN5GS_COMMIT}"; \
+    fi \
+    && meson setup build --prefix=/usr/local \
+    && ninja -C build \
+    && ninja -C build install \
+    && ldconfig \
+    && for bin in open5gs-nrfd open5gs-amfd open5gs-smfd open5gs-upfd open5gs-ausfd open5gs-udmd open5gs-udrd open5gs-pcfd; do \
+        command -v "$bin"; \
+    done \
+    && rm -rf /opt/open5gs/.git /opt/open5gs/build
+
+COPY entrypoint.sh /usr/local/bin/lain5g-open5gs-entrypoint
+RUN chmod +x /usr/local/bin/lain5g-open5gs-entrypoint
+
+ENTRYPOINT ["lain5g-open5gs-entrypoint"]
