@@ -20,6 +20,15 @@ const x310Profile = {
   safety: { maximum_duration_seconds: 60, rf_allowed: false, environment: 'cabled' },
 };
 
+const lteX310Profile = {
+  profile: '4g-lte-x310',
+  network: { mcc: '001', mnc: '01', tac: 7, apn_internet: 'internet', apn_ims: 'ims' },
+  core: { mme_addr: '10.42.0.10' },
+  ran: { enb_bind_addr: '10.42.0.1' },
+  radio: { device: 'x310', usrp_addr: '192.168.10.2', lte_band: 7, earfcn: 3150, bandwidth_mhz: 5, tx_gain: 20, rx_gain: 30, clock_source: 'internal', time_source: 'internal' },
+  safety: { maximum_duration_seconds: 60, rf_allowed: false, environment: 'cabled', attenuation_db: 60, antenna_connected: false, shielded_environment: false, auto_stop: true, authorization_confirmed: false, operator_note: '' },
+};
+
 const summaries = [
   { profile: '4g-volte-sim', rf_capable: false, rf_allowed: false },
   { profile: '4g-lte-x310', rf_capable: true, rf_allowed: false },
@@ -34,6 +43,7 @@ describe('Profile configuration', () => {
       const target = String(url);
       if (target === '/api/profiles') return jsonResponse(summaries);
       if (target === '/api/profiles/4g-volte-sim') return jsonResponse({ ...profile, profile: '4g-volte-sim' });
+      if (target === '/api/profiles/4g-lte-x310') return jsonResponse(lteX310Profile);
       if (target === '/api/profiles/5g-sa' && init?.method === 'PUT') return jsonResponse(profile);
       if (target === '/api/profiles/5g-sa') return jsonResponse(profile);
       if (target === '/api/profiles/5g-sa-x310' && init?.method === 'PUT') return jsonResponse(x310Profile);
@@ -87,5 +97,17 @@ describe('Profile configuration', () => {
     await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/profiles/5g-sa-x310/validate', expect.objectContaining({ method: 'POST' })));
     expect(fetch).not.toHaveBeenCalledWith('/api/profiles/5g-sa-x310/apply', expect.any(Object));
     expect(fetch).not.toHaveBeenCalledWith('/api/profiles/5g-sa-x310/restore', expect.any(Object));
+  });
+
+  it('shows 4g x310 RF safety fields', async () => {
+    renderRoute('/configuration', <ProfileConfigPage />);
+    await userEvent.click(await screen.findByText('4g-lte-x310'));
+    expect(await screen.findByLabelText('Channel bandwidth MHz')).toHaveValue(5);
+    expect(screen.getByLabelText('Laboratory mode')).toHaveValue('cabled');
+    expect(screen.getByLabelText('Attenuation dB')).toHaveValue(60);
+    expect(screen.getByLabelText('Antenna connected')).toHaveValue('false');
+    expect(screen.getByLabelText('Auto-stop enabled')).toHaveValue('true');
+    expect(screen.getByLabelText('RF authorization confirmed')).toHaveValue('false');
+    expect(screen.getByLabelText('Authorization note')).toHaveValue('');
   });
 });
