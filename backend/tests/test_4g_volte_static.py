@@ -15,6 +15,7 @@ def test_required_4g_files_exist():
         DEPLOY / "x310" / "rf" / "safety-manifest.example.yaml",
         DEPLOY / "x310" / "rf" / "channel-plan.example.yaml",
         ROOT / "images" / "srsran4g-sim" / "Dockerfile",
+        ROOT / "images" / "ims-sip" / "Dockerfile",
         ROOT / "images" / "srsran4g-uhd" / "Dockerfile",
     ]
     missing = [str(path) for path in required if not path.exists()]
@@ -66,3 +67,4 @@ def test_secret_values_are_not_committed_in_env_example():
     env = (DEPLOY / "common" / ".env.example").read_text(encoding="utf-8")
     assert "SUBSCRIBER_KEY=\n" in env
     assert "SUBSCRIBER_OPC=\n" in env
+    assert "IMS_AUTH_PASSWORD=\n" in env

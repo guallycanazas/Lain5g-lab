@@ -22,9 +22,13 @@ Edita `deployments/4g-volte/common/.env` y usa claves de laboratorio, nunca cred
 ```bash
 make build-4g-volte-sim
 make start-4g-volte-sim
+docker compose --profile sip --env-file deployments/4g-volte/common/.env \
+  -f deployments/4g-volte/sim/docker-compose.yml up --force-recreate sip-register
 make validate-4g-volte-sim
 make stop-4g-volte-sim
 ```
+
+El paso `sip-register` valida únicamente SIP REGISTER IMS. No valida llamada VoLTE, RTP ni audio.
 
 ## X310 Sin RF
 

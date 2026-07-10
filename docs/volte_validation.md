@@ -1,6 +1,6 @@
 # VoLTE Validation
 
-Estado actual: preparación 4G LTE/IMS. No hay afirmación de llamada VoLTE completa.
+Estado actual: preparación 4G LTE/IMS con REGISTER SIP validable. No hay afirmación de llamada VoLTE completa.
 
 ## Evidencia Mínima Para Declarar VoLTE
 
@@ -12,6 +12,18 @@ Se requiere capturar y conservar evidencia de:
 - Flujo de llamada con `INVITE`, `100 Trying`, `180 Ringing`, `200 OK`, `ACK` y `BYE`.
 - RTP bidireccional entre extremos.
 - Logs de EPC, IMS, eNB y UE asociados al mismo `run-id`.
+
+## SIP REGISTER
+
+Para declarar `sip_register PASS`, la validación requiere evidencia real de:
+
+- REGISTER inicial del cliente SIP.
+- Desafío `401 Unauthorized` o equivalente.
+- REGISTER autenticado.
+- Respuesta final `200 OK`.
+- Logs correlacionados de cliente SIP, P-CSCF, I-CSCF y S-CSCF.
+
+Encontrar solo la palabra `REGISTER` en logs no es suficiente.
 
 ## Estados De Validación
 
