@@ -16,6 +16,7 @@ export function deploymentLabel(status: DeploymentState | string): string {
 export function validationLabel(status: ValidationState | string): string {
   const labels: Record<string, string> = {
     PASS: 'PASS',
+    PARTIAL: 'PARTIAL',
     FAIL: 'FAIL',
     WARNING: 'WARNING',
     NOT_TESTED: 'NOT TESTED',

@@ -9,7 +9,7 @@ export function useLatestValidation() {
 export function useRunValidation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: deploymentsApi.validate,
+    mutationFn: () => deploymentsApi.validate(),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['validation-latest'] });
       await queryClient.invalidateQueries({ queryKey: ['runs'] });

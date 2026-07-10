@@ -29,9 +29,14 @@ export interface ContainerStatus {
 export interface DeploymentSummary {
   id: string;
   name: string;
+  description: string;
   path: string;
   status: DeploymentState;
+  mode: string;
   supported_actions: string[];
+  validation_checks: string[];
+  rf_capable: boolean;
+  components: string[];
 }
 
 export interface DeploymentStatus {

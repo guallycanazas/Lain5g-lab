@@ -4,6 +4,8 @@ import { DashboardPage } from './pages/DashboardPage';
 import { LogsPage } from './pages/LogsPage';
 import { RunDetailPage } from './pages/RunDetailPage';
 import { RunsPage } from './pages/RunsPage';
+import { ScenarioDetailPage } from './pages/ScenarioDetailPage';
+import { ScenariosPage } from './pages/ScenariosPage';
 import { SubscriberCreatePage } from './pages/SubscriberCreatePage';
 import { SubscriberDetailPage } from './pages/SubscriberDetailPage';
 import { SubscriberEditPage } from './pages/SubscriberEditPage';
@@ -19,6 +21,8 @@ export const router = createBrowserRouter([
       { path: 'dashboard', element: <DashboardPage /> },
       { path: 'validation', element: <ValidationPage /> },
       { path: 'logs', element: <LogsPage /> },
+      { path: 'scenarios', element: <ScenariosPage /> },
+      { path: 'scenarios/:scenarioId', element: <ScenarioDetailPage /> },
       { path: 'subscribers', element: <SubscribersPage /> },
       { path: 'subscribers/new', element: <SubscriberCreatePage /> },
       { path: 'subscribers/:imsi', element: <SubscriberDetailPage /> },
