@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import difflib
+import math
 import re
 import shutil
 from dataclasses import dataclass
@@ -27,6 +28,8 @@ class PlannedChange:
 class ProfileConfigService:
     PROFILE_IDS = {"4g-volte-sim", "4g-lte-x310", "5g-sa", "5g-sa-x310", "5g-vonr"}
     SECRET_KEYS = {"SUBSCRIBER_KEY", "SUBSCRIBER_OPC", "SUBSCRIBER_SQN", "IMS_AUTH_PASSWORD", "K", "KI", "OPC"}
+    LTE_BAND_EARFCN_RANGES = {7: range(2750, 3450)}
+    SRSRAN_4G_N_PRB_BY_BANDWIDTH = {1.4: 6, 3.0: 15, 5.0: 25, 10.0: 50, 15.0: 75, 20.0: 100}
 
     def __init__(self, settings: Any):
         self.settings = settings
@@ -63,6 +66,9 @@ class ProfileConfigService:
     def validate_profile(self, profile_id: str) -> dict[str, Any]:
         profile = self.get_profile(profile_id)
         errors = self._validate_shape(profile) + self._validate_consistency(profile)
+        if profile.get("radio"):
+            errors.extend(self._validate_rf_readiness(profile))
+            errors.extend(self._validate_rf_safety(profile))
         return {"profile": profile_id, "valid": not errors, "errors": errors}
 
     def diff_profile(self, profile_id: str) -> dict[str, Any]:
@@ -149,20 +155,65 @@ class ProfileConfigService:
             errors.append("maximum_duration_seconds must be 1..300")
         radio = profile.get("radio") or {}
         if radio:
-            if profile["profile"] == "4g-lte-x310":
-                for key in ("lte_band", "earfcn", "tx_gain", "rx_gain"):
-                    if radio.get(key) in (None, ""):
-                        errors.append(f"radio.{key} is required for 4G RF profiles")
-            if profile["profile"] == "5g-sa-x310":
-                for key in ("band", "dl_arfcn", "tx_gain", "rx_gain"):
-                    if radio.get(key) in (None, ""):
-                        errors.append(f"radio.{key} is required for 5G RF profiles")
+            if "bandwidth_mhz" in radio and radio.get("bandwidth_mhz") is not None and _bandwidth_key(radio.get("bandwidth_mhz")) is None:
+                errors.append("radio.bandwidth_mhz must be numeric")
+        return errors
+
+    def _validate_rf_readiness(self, profile: dict[str, Any]) -> list[str]:
+        errors: list[str] = []
+        radio = profile.get("radio") or {}
+        if profile["profile"] == "4g-lte-x310":
+            for key in ("lte_band", "earfcn", "tx_gain", "rx_gain"):
+                if radio.get(key) in (None, ""):
+                    errors.append(f"radio.{key} is required for 4G RF profiles")
+            if not _valid_bandwidth_mhz(radio.get("bandwidth_mhz"), self.SRSRAN_4G_N_PRB_BY_BANDWIDTH):
+                errors.append("radio.bandwidth_mhz must be one of 1.4, 3, 5, 10, 15, 20 for srsRAN 4G")
+        if profile["profile"] == "5g-sa-x310":
+            for key in ("band", "dl_arfcn", "tx_gain", "rx_gain"):
+                if radio.get(key) in (None, ""):
+                    errors.append(f"radio.{key} is required for 5G RF profiles")
+            if not _valid_bandwidth_mhz(radio.get("bandwidth_mhz"), {5.0: 0, 10.0: 0, 15.0: 0, 20.0: 0, 40.0: 0, 50.0: 0, 100.0: 0}):
+                errors.append("radio.bandwidth_mhz must be one of 5, 10, 15, 20, 40, 50, 100 for 5G RF profiles")
+        return errors
+
+    def _validate_rf_safety(self, profile: dict[str, Any]) -> list[str]:
+        errors: list[str] = []
+        safety = profile.get("safety") or {}
+        environment = str(safety.get("environment", "")).strip().lower()
+        shielded = safety.get("shielded_environment") is True
+        if environment != "cabled" and not shielded:
+            errors.append("RF profiles require a cabled laboratory mode or shielded environment")
+        if safety.get("authorization_confirmed") is not True:
+            errors.append("RF authorization must be confirmed before apply")
+        if safety.get("auto_stop") is not True:
+            errors.append("RF profiles require auto_stop=true")
+        if not str(safety.get("operator_note") or "").strip():
+            errors.append("safety.operator_note must not be empty")
+        if not _is_int(safety.get("maximum_duration_seconds"), 1, 300):
+            errors.append("maximum_duration_seconds must be 1..300")
+        if not _is_int(safety.get("attenuation_db"), 0, 120):
+            errors.append("safety.attenuation_db must be 0..120")
+        elif environment == "cabled" and int(safety.get("attenuation_db")) < 30:
+            errors.append("safety.attenuation_db must be at least 30 dB for cabled RF profiles")
+        if safety.get("antenna_connected") is True and not shielded:
+            errors.append("antenna_connected=true requires shielded_environment=true")
         return errors
 
     def _validate_consistency(self, profile: dict[str, Any]) -> list[str]:
         errors: list[str] = []
         profile_id = profile["profile"]
         network = profile.get("network", {})
+        radio = profile.get("radio") or {}
+        if profile_id == "4g-lte-x310" and radio.get("lte_band") not in (None, "") and radio.get("earfcn") not in (None, ""):
+            try:
+                band = int(radio["lte_band"])
+                earfcn = int(radio["earfcn"])
+            except (TypeError, ValueError):
+                errors.append("radio.lte_band and radio.earfcn must be numeric")
+            else:
+                valid_range = self.LTE_BAND_EARFCN_RANGES.get(band)
+                if valid_range is not None and earfcn not in valid_range:
+                    errors.append(f"radio.earfcn is outside LTE band {band} downlink EARFCN range")
         if profile_id == "5g-sa-x310":
             amf = self.root / "deployments" / "5g-sa" / "open5gs" / "amf.yaml"
             text = _read(amf)
@@ -240,13 +291,26 @@ class ProfileConfigService:
         return self._changes_4g(profile, "sim", "10.41.0.40")
 
     def _changes_4g_lte_x310(self, profile: dict[str, Any]) -> list[PlannedChange]:
-        changes = self._changes_4g(profile, "x310", profile["ran"]["enb_bind_addr"])
-        r, safety = profile["radio"], profile["safety"]
+        n, core, ran, r, safety = profile["network"], profile["core"], profile["ran"], profile["radio"], profile["safety"]
+        enb_rel = "deployments/4g-volte/x310/ran/enb.conf"
+        enb = _patch_enb_conf(_read(self.root / enb_rel), n, core["mme_addr"], ran["enb_bind_addr"], r["earfcn"], r["tx_gain"], r["rx_gain"], r["bandwidth_mhz"], r.get("usrp_addr"))
         channel = _dumps_yaml({"band": r["lte_band"], "earfcn": r["earfcn"], "downlink_frequency_hz": None, "uplink_frequency_hz": None, "bandwidth_mhz": r["bandwidth_mhz"], "tx_gain": r["tx_gain"], "rx_gain": r["rx_gain"], "sample_rate": None})
-        manifest = _dumps_yaml({"lab_mode": safety["environment"], "authorization_confirmed": False, "antenna_connected": False, "attenuation_db": 60, "shielded_environment": False, "maximum_duration_seconds": safety["maximum_duration_seconds"], "auto_stop": True, "capture_logs": True, "operator_note": ""})
-        changes.append(self._change("deployments/4g-volte/x310/rf/channel-plan.yaml", channel))
-        changes.append(self._change("deployments/4g-volte/x310/rf/safety-manifest.yaml", manifest))
-        return changes
+        manifest = _dumps_yaml({
+            "lab_mode": safety["environment"],
+            "authorization_confirmed": safety["authorization_confirmed"],
+            "antenna_connected": safety["antenna_connected"],
+            "attenuation_db": safety["attenuation_db"],
+            "shielded_environment": safety["shielded_environment"],
+            "maximum_duration_seconds": safety["maximum_duration_seconds"],
+            "auto_stop": safety["auto_stop"],
+            "capture_logs": True,
+            "operator_note": safety["operator_note"],
+        })
+        return [
+            self._change(enb_rel, enb),
+            self._change("deployments/4g-volte/x310/rf/channel-plan.yaml", channel),
+            self._change("deployments/4g-volte/x310/rf/safety-manifest.yaml", manifest),
+        ]
 
     def _changes_4g(self, profile: dict[str, Any], variant: str, bind_addr: str) -> list[PlannedChange]:
         n, core, ran, s, ims = profile["network"], profile["core"], profile["ran"], profile["subscriber"], profile.get("ims", {})
@@ -256,7 +320,7 @@ class ProfileConfigService:
         })
         base = f"deployments/4g-volte/{'common' if variant == 'sim' else 'x310'}"
         enb_rel = f"deployments/4g-volte/{variant}/ran/enb.conf"
-        enb = _patch_enb_conf(_read(self.root / enb_rel), n, core["mme_addr"], bind_addr, ran.get("dl_earfcn") or profile.get("radio", {}).get("earfcn"), ran.get("tx_gain") or profile.get("radio", {}).get("tx_gain"), ran.get("rx_gain") or profile.get("radio", {}).get("rx_gain"), profile.get("radio", {}).get("usrp_addr"))
+        enb = _patch_enb_conf(_read(self.root / enb_rel), n, core["mme_addr"], bind_addr, ran.get("dl_earfcn") or profile.get("radio", {}).get("earfcn"), ran.get("tx_gain") or profile.get("radio", {}).get("tx_gain"), ran.get("rx_gain") or profile.get("radio", {}).get("rx_gain"), usrp_addr=profile.get("radio", {}).get("usrp_addr"))
         changes = [
             self._change("deployments/4g-volte/common/.env", env),
             self._change(f"{base}/open5gs/mme.yaml", _patch_4g_mme(_read(self.root / f"{base}/open5gs/mme.yaml"), n)),
@@ -339,6 +403,8 @@ def _parse_scalar(value: str) -> Any:
         return value[1:-1]
     if re.fullmatch(r"-?\d+", value):
         return int(value)
+    if re.fullmatch(r"-?\d+\.\d+", value):
+        return float(value)
     return value
 
 
@@ -362,6 +428,8 @@ def _format_scalar(value: Any) -> str:
     if value is False:
         return "false"
     if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
         return str(value)
     text = str(value)
     if text == "" or re.fullmatch(r"0[0-9]+", text) or any(ch in text for ch in ":#{}[]"):
@@ -469,13 +537,37 @@ def _patch_4g_pgwc(text: str, n: dict[str, Any]) -> str:
     return re.sub(r"dnn:\s*ims\b", f"dnn: {n['apn_ims']}", text)
 
 
-def _patch_enb_conf(text: str, n: dict[str, Any], mme_addr: str, bind_addr: str, earfcn: Any, tx_gain: Any, rx_gain: Any, usrp_addr: Any = None) -> str:
+def _patch_enb_conf(text: str, n: dict[str, Any], mme_addr: str, bind_addr: str, earfcn: Any, tx_gain: Any, rx_gain: Any, bandwidth_mhz: Any = None, usrp_addr: Any = None) -> str:
     replacements = {"mcc": n["mcc"], "mnc": n["mnc"], "mme_addr": mme_addr, "gtp_bind_addr": bind_addr, "s1c_bind_addr": bind_addr, "dl_earfcn": earfcn, "tx_gain": tx_gain, "rx_gain": rx_gain}
+    if bandwidth_mhz is not None:
+        replacements["n_prb"] = _srsran_4g_n_prb(bandwidth_mhz)
     for key, value in replacements.items():
         text = _replace_all(text, rf"^{key}\s*=.*$", f"{key} = {value}")
     if usrp_addr:
         text = re.sub(r"addr=[0-9.]+", f"addr={usrp_addr}", text)
     return text
+
+
+def _bandwidth_key(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(number):
+        return None
+    return round(number, 1)
+
+
+def _valid_bandwidth_mhz(value: Any, allowed: dict[float, Any]) -> bool:
+    key = _bandwidth_key(value)
+    return key in allowed if key is not None else False
+
+
+def _srsran_4g_n_prb(bandwidth_mhz: Any) -> int:
+    key = _bandwidth_key(bandwidth_mhz)
+    if key not in ProfileConfigService.SRSRAN_4G_N_PRB_BY_BANDWIDTH:
+        raise ProfileConfigError(422, "PROFILE_VALIDATION_FAILED", "Unsupported srsRAN 4G channel bandwidth")
+    return ProfileConfigService.SRSRAN_4G_N_PRB_BY_BANDWIDTH[key]
 
 
 def _patch_ue_conf(text: str, n: dict[str, Any], imsi: str, earfcn: Any) -> str:
