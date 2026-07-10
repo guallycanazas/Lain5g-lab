@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: build-5g-sa start-5g-sa stop-5g-sa restart-5g-sa status-5g-sa logs-5g-sa validate-5g-sa clean-5g-sa backend-install backend-dev backend-test backend-cov
+.PHONY: build-5g-sa start-5g-sa stop-5g-sa restart-5g-sa status-5g-sa logs-5g-sa validate-5g-sa clean-5g-sa backend-install backend-dev backend-test backend-cov frontend-install frontend-dev frontend-build frontend-test app-build app-up app-down app-logs app-ps
 
 build-5g-sa:
 	@if [ "$${LAIN5G_DRY_RUN:-false}" = "true" ]; then \
@@ -48,3 +48,50 @@ backend-test:
 
 backend-cov:
 	.venv/bin/pytest --cov=backend/app --cov-report=term-missing backend/tests
+
+frontend-install:
+	cd frontend && npm install
+
+frontend-dev:
+	cd frontend && npm run dev
+
+frontend-build:
+	cd frontend && npm run build
+
+frontend-test:
+	cd frontend && npm test
+
+app-build:
+	@if [ ! -f .env.app ]; then \
+		echo "Missing .env.app. Create it with: cp .env.app.example .env.app" >&2; \
+		exit 2; \
+	fi
+	docker compose --env-file .env.app -f docker-compose.app.yml build
+
+app-up:
+	@if [ ! -f .env.app ]; then \
+		echo "Missing .env.app. Create it with: cp .env.app.example .env.app" >&2; \
+		exit 2; \
+	fi
+	docker compose --env-file .env.app -f docker-compose.app.yml up -d --build
+
+app-down:
+	@if [ ! -f .env.app ]; then \
+		echo "Missing .env.app. Create it with: cp .env.app.example .env.app" >&2; \
+		exit 2; \
+	fi
+	docker compose --env-file .env.app -f docker-compose.app.yml down
+
+app-logs:
+	@if [ ! -f .env.app ]; then \
+		echo "Missing .env.app. Create it with: cp .env.app.example .env.app" >&2; \
+		exit 2; \
+	fi
+	docker compose --env-file .env.app -f docker-compose.app.yml logs -f
+
+app-ps:
+	@if [ ! -f .env.app ]; then \
+		echo "Missing .env.app. Create it with: cp .env.app.example .env.app" >&2; \
+		exit 2; \
+	fi
+	docker compose --env-file .env.app -f docker-compose.app.yml ps

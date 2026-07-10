@@ -1,9 +1,13 @@
 .env
+.env.app
 backend/.env
+frontend/.env
+frontend/.env.local
 .venv/
 node_modules/
 __pycache__/
 *.pyc
+*.tsbuildinfo
 *.db
 *.sqlite
 .coverage
