@@ -37,11 +37,14 @@ class RunService:
                 continue
             if not isinstance(metadata, dict) or not metadata.get("run_id"):
                 continue
+            validation = self._read_optional_json(child / "validation.json")
+            validation_status = self._validation_status(validation if isinstance(validation, dict) else None)
             if scenario and metadata.get("scenario") != scenario:
                 continue
-            if status and metadata.get("status") != status:
+            summary_status = validation_status or metadata.get("status")
+            if status and summary_status != status:
                 continue
-            summaries.append(self._summary_from_metadata(metadata))
+            summaries.append(self._summary_from_metadata(metadata, status=summary_status))
 
         summaries.sort(key=self._summary_sort_key, reverse=True)
         if limit is not None:
@@ -72,17 +75,36 @@ class RunService:
             return None
         return self.get_run(summaries[0].run_id)
 
-    def _summary_from_metadata(self, metadata: dict[str, Any]) -> RunSummary:
+    def _summary_from_metadata(self, metadata: dict[str, Any], *, status: str | None = None) -> RunSummary:
         return RunSummary(
             run_id=str(metadata.get("run_id", "")),
             scenario=metadata.get("scenario"),
             deployment_path=metadata.get("deployment_path"),
             started_at=metadata.get("started_at"),
             finished_at=metadata.get("finished_at"),
-            status=metadata.get("status"),
+            status=status or metadata.get("status"),
             git_commit=metadata.get("git_commit"),
             validated_claims=metadata.get("validated_claims") if isinstance(metadata.get("validated_claims"), list) else [],
         )
+
+    @staticmethod
+    def _validation_status(validation: dict[str, Any] | None) -> str | None:
+        if not validation:
+            return None
+        status = validation.get("status")
+        if isinstance(status, str) and status:
+            return status
+        checks = validation.get("checks")
+        if not isinstance(checks, list) or not checks:
+            return None
+        statuses = [check.get("status") for check in checks if isinstance(check, dict)]
+        if "FAIL" in statuses:
+            return "FAIL"
+        if "WARNING" in statuses:
+            return "WARNING"
+        if statuses and all(item == "PASS" for item in statuses):
+            return "PASS"
+        return "NOT_TESTED"
 
     @staticmethod
     def _summary_sort_key(summary: RunSummary) -> str:

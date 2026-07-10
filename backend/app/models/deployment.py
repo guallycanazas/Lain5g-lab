@@ -12,6 +12,7 @@ class ErrorDetail(BaseModel):
     message: str
     exit_code: int | None = None
     stderr: str | None = None
+    active_scenario: str | None = None
 
 
 class ErrorResponse(BaseModel):
@@ -47,9 +48,14 @@ class ContainerStatus(BaseModel):
 class DeploymentSummary(BaseModel):
     id: str
     name: str
+    description: str = ""
     path: str
     status: DeploymentState
+    mode: str = "simulation"
     supported_actions: list[str]
+    validation_checks: list[str] = Field(default_factory=list)
+    rf_capable: bool = False
+    components: list[str] = Field(default_factory=list)
 
 
 class DeploymentStatus(BaseModel):

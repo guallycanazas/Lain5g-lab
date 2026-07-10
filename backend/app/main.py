@@ -37,8 +37,8 @@ def create_app() -> FastAPI:
     return app
 
 
-def error_response(status_code: int, code: str, message: str, *, exit_code: int | None = None, stderr: str | None = None) -> JSONResponse:
-    body = ErrorResponse(detail=ErrorDetail(code=code, message=message, exit_code=exit_code, stderr=stderr))
+def error_response(status_code: int, code: str, message: str, *, exit_code: int | None = None, stderr: str | None = None, active_scenario: str | None = None) -> JSONResponse:
+    body = ErrorResponse(detail=ErrorDetail(code=code, message=message, exit_code=exit_code, stderr=stderr, active_scenario=active_scenario))
     return JSONResponse(status_code=status_code, content=body.model_dump())
 
 
@@ -49,7 +49,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(DeploymentConflictError)
     async def deployment_conflict_handler(request: Request, exc: DeploymentConflictError) -> JSONResponse:
-        return error_response(409, "DEPLOYMENT_CONFLICT", str(exc))
+        return error_response(409, "DEPLOYMENT_CONFLICT", str(exc), active_scenario=getattr(exc, "active_scenario", None))
 
     @app.exception_handler(DeploymentCommandError)
     async def deployment_command_handler(request: Request, exc: DeploymentCommandError) -> JSONResponse:

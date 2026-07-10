@@ -51,3 +51,23 @@ def deployment_logs(
 @router.post("/{scenario}/validate", response_model=ValidationReport)
 def validate_deployment(scenario: str, service: DeploymentService = Depends(get_deployment_service)) -> ValidationReport:
     return service.validate(scenario)
+
+
+@router.post("/4g-lte-x310/hardware-check", response_model=DeploymentActionResponse)
+def x310_hardware_check(service: DeploymentService = Depends(get_deployment_service)) -> DeploymentActionResponse:
+    return service.hardware_check("4g-lte-x310")
+
+
+@router.post("/4g-lte-x310/preflight", response_model=DeploymentActionResponse)
+def x310_preflight(service: DeploymentService = Depends(get_deployment_service)) -> DeploymentActionResponse:
+    return service.preflight("4g-lte-x310")
+
+
+@router.post("/4g-lte-x310/start-epc", response_model=DeploymentActionResponse)
+def x310_start_epc(service: DeploymentService = Depends(get_deployment_service)) -> DeploymentActionResponse:
+    return service.start_epc("4g-lte-x310")
+
+
+@router.post("/4g-lte-x310/emergency-stop", response_model=DeploymentActionResponse)
+def x310_emergency_stop(service: DeploymentService = Depends(get_deployment_service)) -> DeploymentActionResponse:
+    return service.emergency_stop("4g-lte-x310")
