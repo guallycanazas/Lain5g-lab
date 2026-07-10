@@ -4,6 +4,10 @@ import { DashboardPage } from './pages/DashboardPage';
 import { LogsPage } from './pages/LogsPage';
 import { RunDetailPage } from './pages/RunDetailPage';
 import { RunsPage } from './pages/RunsPage';
+import { SubscriberCreatePage } from './pages/SubscriberCreatePage';
+import { SubscriberDetailPage } from './pages/SubscriberDetailPage';
+import { SubscriberEditPage } from './pages/SubscriberEditPage';
+import { SubscribersPage } from './pages/SubscribersPage';
 import { ValidationPage } from './pages/ValidationPage';
 
 export const router = createBrowserRouter([
@@ -15,6 +19,10 @@ export const router = createBrowserRouter([
       { path: 'dashboard', element: <DashboardPage /> },
       { path: 'validation', element: <ValidationPage /> },
       { path: 'logs', element: <LogsPage /> },
+      { path: 'subscribers', element: <SubscribersPage /> },
+      { path: 'subscribers/new', element: <SubscriberCreatePage /> },
+      { path: 'subscribers/:imsi', element: <SubscriberDetailPage /> },
+      { path: 'subscribers/:imsi/edit', element: <SubscriberEditPage /> },
       { path: 'runs', element: <RunsPage /> },
       { path: 'runs/:runId', element: <RunDetailPage /> },
       { path: '*', element: <Navigate to="/" replace /> },
