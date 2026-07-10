@@ -10,6 +10,7 @@ RUN apt-get update \
         bison \
         build-essential \
         ca-certificates \
+        cmake \
         curl \
         flex \
         git \

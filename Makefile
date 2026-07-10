@@ -7,7 +7,7 @@ build-5g-sa:
 		echo "docker build -t lain5g-lab/open5gs:local images/open5gs"; \
 		echo "docker build -t lain5g-lab/ueransim:local images/ueransim"; \
 	else \
-		docker build -t lain5g-lab/open5gs:local images/open5gs; \
+		docker build -t lain5g-lab/open5gs:local images/open5gs && \
 		docker build -t lain5g-lab/ueransim:local images/ueransim; \
 	fi
 
