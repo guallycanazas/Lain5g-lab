@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: build-5g-sa start-5g-sa stop-5g-sa restart-5g-sa status-5g-sa logs-5g-sa validate-5g-sa clean-5g-sa backend-install backend-dev backend-test backend-cov frontend-install frontend-dev frontend-build frontend-test app-build app-up app-down app-logs app-ps
+.PHONY: build-5g-sa start-5g-sa stop-5g-sa restart-5g-sa status-5g-sa logs-5g-sa validate-5g-sa clean-5g-sa backend-install backend-dev backend-test backend-cov frontend-install frontend-dev frontend-build frontend-test app-build app-up app-down app-logs app-ps subscribers-test subscribers-integration-test
 
 build-5g-sa:
 	@if [ "$${LAIN5G_DRY_RUN:-false}" = "true" ]; then \
@@ -95,3 +95,14 @@ app-ps:
 		exit 2; \
 	fi
 	docker compose --env-file .env.app -f docker-compose.app.yml ps
+
+subscribers-test:
+	.venv/bin/pytest backend/tests/test_open5gs_connection_service.py backend/tests/test_subscriber_service.py backend/tests/test_subscribers_api.py
+	cd frontend && npm test -- subscribers
+
+subscribers-integration-test:
+	@if [ "$${LAIN5G_ALLOW_INTEGRATION_WRITES:-false}" != "true" ]; then \
+		echo "Refusing to modify Open5GS MongoDB. Set LAIN5G_ALLOW_INTEGRATION_WRITES=true to run subscriber integration writes." >&2; \
+		exit 2; \
+	fi
+	@echo "Run the documented subscriber integration workflow in docs/subscribers.md."

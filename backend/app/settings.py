@@ -21,6 +21,12 @@ class Settings(BaseSettings):
         alias="LAIN5G_CORS_ORIGINS",
     )
     max_output_chars: int = Field(default=20000, ge=1000, le=200000, alias="LAIN5G_MAX_OUTPUT_CHARS")
+    open5gs_mongo_uri: str = Field(default="mongodb://mongo:27017/open5gs", alias="LAIN5G_OPEN5GS_MONGO_URI")
+    open5gs_mongo_database: str = Field(default="open5gs", alias="LAIN5G_OPEN5GS_MONGO_DATABASE")
+    open5gs_subscriber_collection: str = Field(default="subscribers", alias="LAIN5G_OPEN5GS_SUBSCRIBER_COLLECTION")
+    subscriber_secrets_visible: bool = Field(default=False, alias="LAIN5G_SUBSCRIBER_SECRETS_VISIBLE")
+    subscriber_operation_timeout: int = Field(default=15, ge=1, le=120, alias="LAIN5G_SUBSCRIBER_OPERATION_TIMEOUT")
+    open5gs_docker_network: str = Field(default="lain5g-lab-5g-sa-core", alias="LAIN5G_OPEN5GS_DOCKER_NETWORK")
 
     model_config = SettingsConfigDict(
         env_file="backend/.env",
