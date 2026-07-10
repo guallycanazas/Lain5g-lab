@@ -71,7 +71,7 @@ else
     add_check "ng_connection" "FAIL" "gNB is not running"
   fi
 
-  if logs_have ue 'Registration is successful|Registration.*successful|5GMM.*Registered'; then
+if logs_have ue 'Initial Registration is successful|Registration is successful|Registration.*successful|5GMM.*Registered'; then
     add_check "ue_registration" "PASS" "UE registration evidence found"
     validated_claims+=("UE registered")
   elif is_running ue; then
