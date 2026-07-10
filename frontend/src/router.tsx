@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AppLayout } from './components/AppLayout';
 import { DashboardPage } from './pages/DashboardPage';
 import { LogsPage } from './pages/LogsPage';
+import { ProfileConfigPage } from './pages/ProfileConfigPage';
 import { RunDetailPage } from './pages/RunDetailPage';
 import { RunsPage } from './pages/RunsPage';
 import { ScenarioDetailPage } from './pages/ScenarioDetailPage';
@@ -21,6 +22,7 @@ export const router = createBrowserRouter([
       { path: 'dashboard', element: <DashboardPage /> },
       { path: 'validation', element: <ValidationPage /> },
       { path: 'logs', element: <LogsPage /> },
+      { path: 'configuration', element: <ProfileConfigPage /> },
       { path: 'scenarios', element: <ScenariosPage /> },
       { path: 'scenarios/:scenarioId', element: <ScenarioDetailPage /> },
       { path: 'subscribers', element: <SubscribersPage /> },
