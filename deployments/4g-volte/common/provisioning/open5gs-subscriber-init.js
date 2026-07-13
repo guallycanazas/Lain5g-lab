@@ -23,7 +23,7 @@ db.subscribers.updateOne(
   {
     $set: {
       imsi,
-      msisdn: env.SUBSCRIBER_MSISDN || '',
+      msisdn: env.SUBSCRIBER_MSISDN ? [env.SUBSCRIBER_MSISDN] : [],
       schema_version: 1,
       subscribed_rau_tau_timer: 12,
       network_access_mode: 0,

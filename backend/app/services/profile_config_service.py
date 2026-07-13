@@ -151,8 +151,8 @@ class ProfileConfigService:
         safety = profile.get("safety") or {}
         if safety.get("rf_allowed") is not False:
             errors.append("RF authorization must be false by default in the central profile")
-        if "maximum_duration_seconds" in safety and not _is_int(safety.get("maximum_duration_seconds"), 1, 300):
-            errors.append("maximum_duration_seconds must be 1..300")
+        if "maximum_duration_seconds" in safety and not _is_int(safety.get("maximum_duration_seconds"), 1, 600):
+            errors.append("maximum_duration_seconds must be 1..600")
         radio = profile.get("radio") or {}
         if radio:
             if "bandwidth_mhz" in radio and radio.get("bandwidth_mhz") is not None and _bandwidth_key(radio.get("bandwidth_mhz")) is None:
@@ -189,8 +189,8 @@ class ProfileConfigService:
             errors.append("RF profiles require auto_stop=true")
         if not str(safety.get("operator_note") or "").strip():
             errors.append("safety.operator_note must not be empty")
-        if not _is_int(safety.get("maximum_duration_seconds"), 1, 300):
-            errors.append("maximum_duration_seconds must be 1..300")
+        if not _is_int(safety.get("maximum_duration_seconds"), 1, 600):
+            errors.append("maximum_duration_seconds must be 1..600")
         if not _is_int(safety.get("attenuation_db"), 0, 120):
             errors.append("safety.attenuation_db must be 0..120")
         elif environment == "cabled" and int(safety.get("attenuation_db")) < 30:

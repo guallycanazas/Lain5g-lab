@@ -12,6 +12,19 @@ mkdir -p "$run_dir/logs"
 LAIN5G_RUN_ID="$run_id" "$script_dir/preflight.sh"
 duration="$(sed -n 's/^maximum_duration_seconds:[[:space:]]*//p' "$manifest" | head -n1)"
 if [ "${LAIN5G_DRY_RUN:-false}" = "true" ]; then echo "DRY RUN: docker compose --profile rf up enb-x310 for ${duration}s"; exit 0; fi
+
+if command -v cpupower >/dev/null 2>&1; then
+  if [ "${EUID:-$(id -u)}" -eq 0 ]; then
+    cpupower frequency-set -g performance >/dev/null 2>&1 || echo "WARNING: could not set CPU governor to performance" >&2
+  elif sudo -n true 2>/dev/null; then
+    sudo -n cpupower frequency-set -g performance >/dev/null 2>&1 || echo "WARNING: could not set CPU governor to performance" >&2
+  else
+    echo "WARNING: sudo is required to set CPU governor to performance" >&2
+  fi
+else
+  echo "WARNING: cpupower not found; CPU governor was not changed" >&2
+fi
+
 printf '%s\nrun_id=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$run_id" > "$scenario_dir/.rf-active"
 cleanup(){ (cd "$scenario_dir" && docker compose --env-file ../common/.env -f docker-compose.yml --profile rf logs --no-color enb-x310 >"$run_dir/logs/enb-x310.log" 2>/dev/null || true); (cd "$scenario_dir" && docker compose --env-file ../common/.env -f docker-compose.yml stop enb-x310 >/dev/null 2>&1 || true); rm -f "$scenario_dir/.rf-active"; }
 trap cleanup EXIT INT TERM

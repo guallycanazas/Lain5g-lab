@@ -4,4 +4,5 @@
   hosts /etc/coredns/ims.hosts {
     fallthrough
   }
+  forward . 1.1.1.1 8.8.8.8
 }

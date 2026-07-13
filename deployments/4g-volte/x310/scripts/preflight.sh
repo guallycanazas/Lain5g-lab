@@ -27,7 +27,7 @@ if [ -f "$manifest" ]; then
   grep -Eq '^auto_stop:[[:space:]]*true' "$manifest" && add auto_stop PASS "auto-stop enabled" || add auto_stop FAIL "auto-stop must be true"
   grep -Eq '^capture_logs:[[:space:]]*true' "$manifest" && add capture_logs PASS "log capture enabled" || add capture_logs FAIL "capture_logs must be true"
   duration="$(sed -n 's/^maximum_duration_seconds:[[:space:]]*//p' "$manifest" | head -n1)"
-  [[ "$duration" =~ ^[0-9]+$ ]] && [ "$duration" -gt 0 ] && [ "$duration" -le 300 ] && add duration PASS "duration ${duration}s" || add duration FAIL "duration must be 1..300 seconds"
+  [[ "$duration" =~ ^[0-9]+$ ]] && [ "$duration" -gt 0 ] && [ "$duration" -le 600 ] && add duration PASS "duration ${duration}s" || add duration FAIL "duration must be 1..600 seconds"
   note="$(sed -n 's/^operator_note:[[:space:]]*//p' "$manifest" | tr -d '"' | head -n1)"
   [ -n "$note" ] && add operator_note PASS "operator note present" || add operator_note FAIL "operator note required"
   mode="$(sed -n 's/^lab_mode:[[:space:]]*//p' "$manifest" | head -n1)"

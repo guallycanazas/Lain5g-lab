@@ -24,6 +24,18 @@ services:
     networks: { epc: { ipv4_address: 10.42.0.3 } }
     restart: "no"
 
+  webui:
+    image: lain5g/open5gs-webui:local
+    container_name: lain5g-lab-4g-lte-x310-webui
+    environment:
+      DB_URI: mongodb://mongo/open5gs
+      HOSTNAME: 0.0.0.0
+      PORT: 9999
+    depends_on:
+      mongo: { condition: service_healthy }
+    ports: ["9999:9999"]
+    networks: { epc: { ipv4_address: 10.42.0.4 } }
+
   mme:
     image: lain5g-lab/open5gs:local
     container_name: lain5g-lab-4g-lte-x310-mme
@@ -78,6 +90,8 @@ services:
     environment:
       UE_SUBNET: ${UE_INTERNET_SUBNET:-10.55.0.0/16}
       UE_GATEWAY: 10.55.0.1
+      UE_IMS_SUBNET: ${UE_IMS_SUBNET:-10.56.0.0/16}
+      UE_IMS_GATEWAY: 10.56.0.1
     cap_add: [NET_ADMIN]
     devices: ["/dev/net/tun:/dev/net/tun"]
     volumes: ["./open5gs/pgwu.yaml:/etc/open5gs/pgwu.yaml:ro"]
@@ -146,6 +160,10 @@ services:
     container_name: lain5g-lab-4g-lte-x310-enb
     profiles: ["rf"]
     network_mode: host
+    cap_add: [SYS_NICE, SYS_RESOURCE]
+    ulimits:
+      rtprio: 99
+      memlock: -1
     command: ["srsenb", "/etc/srsran/enb.conf", "--enb_files.rr_config=/etc/srsran/rr.conf", "--enb_files.sib_config=/etc/srsran/sib.conf", "--enb_files.rb_config=/etc/srsran/rb.conf"]
     depends_on: [mme]
     volumes:
