@@ -91,6 +91,10 @@ services:
     profiles: ["rf"]
     network_mode: host
     restart: "no"
+    cap_add: [SYS_NICE, SYS_RESOURCE]
+    ulimits:
+      rtprio: 99
+      memlock: -1
     environment:
       AMF_ADDR: ${AMF_ADDR:-10.20.0.5}
       GNB_BIND_ADDR: ${GNB_BIND_ADDR:-0.0.0.0}

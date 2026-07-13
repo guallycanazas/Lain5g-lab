@@ -25,7 +25,7 @@ RUN git clone --depth 1 --branch "${UHD_VERSION}" https://github.com/EttusResear
       -DENABLE_TESTS=OFF \
       -DENABLE_EXAMPLES=ON \
       -DENABLE_UTILS=ON \
-      -DENABLE_C_API=OFF \
+      -DENABLE_C_API=ON \
       -DENABLE_PYTHON_API=OFF \
       -DENABLE_MAN_PAGES=OFF \
     && cmake --build uhd/host/build \
@@ -34,23 +34,30 @@ RUN git clone --depth 1 --branch "${UHD_VERSION}" https://github.com/EttusResear
     && command -v uhd_find_devices \
     && command -v uhd_usrp_probe \
     && command -v uhd_config_info \
+    && test -f /usr/local/include/uhd.h \
+    && test -f /usr/local/include/uhd/error.h \
     && (command -v benchmark_rate || true) \
     && uhd_config_info --version | grep -F "4.10.0" \
     && rm -rf /opt/uhd/.git /opt/uhd/host/build
+
+COPY uhd-4.10-event-code-ok.patch /tmp/uhd-4.10-event-code-ok.patch
 
 RUN git clone --depth 1 --branch "${SRSRAN_PROJECT_REF}" https://github.com/srsran/srsRAN_Project.git srsran_project \
     && cd srsran_project \
     && git fetch --depth 1 origin "${SRSRAN_PROJECT_COMMIT}" \
     && git checkout "${SRSRAN_PROJECT_COMMIT}" \
+    && git apply --unidiff-zero /tmp/uhd-4.10-event-code-ok.patch \
     && cmake -S . -B build -G Ninja \
       -DENABLE_EXPORT=OFF \
       -DENABLE_TESTS=OFF \
       -DENABLE_UHD=ON \
+      -DUHD_INCLUDE_DIRS=/usr/local/include \
     && cmake --build build --target gnb \
     && install -m 0755 build/apps/gnb/gnb /usr/local/bin/gnb \
     && ldconfig \
     && command -v gnb \
     && gnb --version \
+    && ldd /usr/local/bin/gnb | grep -F "libuhd" \
     && rm -rf /opt/srsran_project/.git /opt/srsran_project/build
 
 COPY entrypoint.sh /usr/local/bin/lain5g-srsranproject-uhd-entrypoint

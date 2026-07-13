@@ -14,9 +14,8 @@ cu_cp:
                 sd: ${SD}
 
 cu_up:
-  ngu:
-    socket:
-      - bind_addr: ${N3_BIND_ADDR}
+  upf:
+    bind_addr: ${N3_BIND_ADDR}
 
 ru_sdr:
   device_driver: uhd

@@ -22,7 +22,13 @@ active_manifest="$manifest_example"; [ -f "$manifest" ] && active_manifest="$man
 active_channel="$channel_example"; [ -f "$channel" ] && active_channel="$channel"
 
 [ -f "$env_file" ] && add env PASS ".env present" || add env WARNING ".env missing; using .env.example for preparation checks"
-docker image inspect "$image" >/dev/null 2>&1 && add image PASS "$image exists" || add image FAIL "$image missing"
+if docker image inspect "$image" >/dev/null 2>&1; then
+  add image PASS "$image exists"
+  docker run --rm "$image" sh -lc 'ldd "$(command -v gnb)" | grep -Fq libuhd' && add gnb_uhd_link PASS "gNB links UHD" || add gnb_uhd_link FAIL "gNB binary does not link libuhd"
+else
+  add image FAIL "$image missing"
+  add gnb_uhd_link FAIL "image missing"
+fi
 docker compose --env-file "$env_example" -f "$scenario_dir/docker-compose.yml" config --quiet && add compose_config PASS "docker compose config valid" || add compose_config FAIL "docker compose config invalid"
 
 if grep -q 'image: lain5g-lab/srsranproject-uhd:local' "$scenario_dir/docker-compose.yml" && grep -q 'profiles: \["rf"\]' "$scenario_dir/docker-compose.yml"; then add gnb_profile PASS "gNB is isolated behind rf profile"; else add gnb_profile FAIL "gNB rf profile missing"; fi

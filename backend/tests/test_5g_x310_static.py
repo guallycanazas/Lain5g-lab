@@ -11,6 +11,7 @@ def test_required_5g_x310_files_exist():
     required = [
         IMAGE / "Dockerfile",
         IMAGE / "entrypoint.sh",
+        IMAGE / "uhd-4.10-event-code-ok.patch",
         IMAGE / "README.md",
         DEPLOY / "docker-compose.yml",
         DEPLOY / ".env.example",
@@ -33,6 +34,10 @@ def test_srsran_project_image_is_pinned_and_safe():
     assert "SRSRAN_PROJECT_REF=release_24_10_1" in dockerfile
     assert "SRSRAN_PROJECT_COMMIT=ef4b0749a12a3b1a8347ae01c937a621603b4069" in dockerfile
     assert "UHD_VERSION=v4.10.0.0" in dockerfile
+    assert "-DENABLE_C_API=ON" in dockerfile
+    assert "-DUHD_INCLUDE_DIRS=/usr/local/include" in dockerfile
+    assert "uhd-4.10-event-code-ok.patch" in dockerfile
+    assert "libuhd" in dockerfile
     assert "gnb --version" in dockerfile
     assert "uhd_config_info --version" in dockerfile
     assert "uhd_image_loader" not in entrypoint
@@ -43,6 +48,8 @@ def test_compose_is_isolated_and_rf_profile_only():
     assert "name: lain5g-lab-5g-sa-x310" in compose
     assert "profiles: [\"rf\"]" in compose
     assert "network_mode: host" in compose
+    assert "cap_add: [SYS_NICE, SYS_RESOURCE]" in compose
+    assert "rtprio: 99" in compose
     assert "privileged" not in compose
     assert "lain5g-lab/ueransim" not in compose
     assert "../5g-sa/open5gs/amf.yaml" in compose
@@ -67,12 +74,17 @@ def test_gnb_config_targets_x310_and_open5gs_mapping():
 
 
 def test_rf_start_requires_guardrails_and_scripts_are_non_destructive():
+    start_core = (DEPLOY / "scripts" / "start-core.sh").read_text(encoding="utf-8")
     start = (DEPLOY / "scripts" / "start-gnb.sh").read_text(encoding="utf-8")
     preflight = (DEPLOY / "scripts" / "preflight.sh").read_text(encoding="utf-8")
     hardware = (DEPLOY / "scripts" / "hardware-check.sh").read_text(encoding="utf-8")
+    assert "ip route replace" in start_core
+    assert "lain5g-lab-5g-sa-x310-upf" in start_core
     assert "LAIN5G_ALLOW_5G_RF_START" in start
     assert "REQUIRE_RF_READY=true" in start
+    assert "cpupower frequency-set -g performance" in start
     assert "authorization_confirmed" in preflight
+    assert "gnb_uhd_link" in preflight
     assert "uhd_find_devices" in hardware
     assert "uhd_usrp_probe" in hardware
     for script in (DEPLOY / "scripts").glob("*.sh"):
