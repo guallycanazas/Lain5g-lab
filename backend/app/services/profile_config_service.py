@@ -26,7 +26,8 @@ class PlannedChange:
 
 
 class ProfileConfigService:
-    PROFILE_IDS = {"4g-volte-sim", "4g-lte-x310", "5g-sa", "5g-sa-x310", "5g-vonr"}
+    PROFILE_IDS = {"4g-lte-sim", "4g-volte-sim", "4g-lte-x310", "5g-sa", "5g-sa-x310", "5g-nsa-x310", "5g-vonr"}
+    CATALOG_PROFILE_IDS = {"4g-lte-sim", "4g-lte-x310", "5g-sa", "5g-sa-x310", "5g-nsa-x310"}
     SECRET_KEYS = {"SUBSCRIBER_KEY", "SUBSCRIBER_OPC", "SUBSCRIBER_SQN", "IMS_AUTH_PASSWORD", "K", "KI", "OPC"}
     LTE_BAND_EARFCN_RANGES = {7: range(2750, 3450)}
     SRSRAN_4G_N_PRB_BY_BANDWIDTH = {1.4: 6, 3.0: 15, 5.0: 25, 10.0: 50, 15.0: 75, 20.0: 100}
@@ -38,7 +39,7 @@ class ProfileConfigService:
         self.backups_dir = self.root / ".backups" / "config"
 
     def list_profiles(self) -> list[dict[str, Any]]:
-        return [self._summary(self.get_profile(profile_id)) for profile_id in sorted(self.PROFILE_IDS)]
+        return [self._summary(self.get_profile(profile_id)) for profile_id in sorted(self.CATALOG_PROFILE_IDS)]
 
     def get_profile(self, profile_id: str) -> dict[str, Any]:
         self._assert_profile(profile_id)
@@ -174,6 +175,16 @@ class ProfileConfigService:
                     errors.append(f"radio.{key} is required for 5G RF profiles")
             if not _valid_bandwidth_mhz(radio.get("bandwidth_mhz"), {5.0: 0, 10.0: 0, 15.0: 0, 20.0: 0, 40.0: 0, 50.0: 0, 100.0: 0}):
                 errors.append("radio.bandwidth_mhz must be one of 5, 10, 15, 20, 40, 50, 100 for 5G RF profiles")
+        if profile["profile"] == "5g-nsa-x310":
+            required = ("device", "usrp_addr", "lte_band", "earfcn", "bandwidth_mhz", "nr_band", "nr_dl_arfcn", "subcarrier_spacing_khz", "tx_gain", "rx_gain", "clock_source", "time_source")
+            for key in required:
+                if radio.get(key) in (None, ""):
+                    errors.append(f"radio.{key} is required for 5G NSA RF profiles")
+            if not _valid_bandwidth_mhz(radio.get("bandwidth_mhz"), {10.0: 0}):
+                errors.append("radio.bandwidth_mhz must be 10 for the current NSA EN-DC profile")
+            for key in ("tx_gain", "rx_gain"):
+                if not _is_finite_number(radio.get(key), 0, 100):
+                    errors.append(f"radio.{key} must be a finite value between 0 and 100")
         return errors
 
     def _validate_rf_safety(self, profile: dict[str, Any]) -> list[str]:
@@ -197,6 +208,13 @@ class ProfileConfigService:
             errors.append("safety.attenuation_db must be at least 30 dB for cabled RF profiles")
         if safety.get("antenna_connected") is True and not shielded:
             errors.append("antenna_connected=true requires shielded_environment=true")
+        if profile["profile"] == "5g-nsa-x310":
+            if safety.get("nr_rf_path_connected") is not True:
+                errors.append("5G NSA requires nr_rf_path_connected=true")
+            if safety.get("authorized_lab_frequencies") is not True:
+                errors.append("5G NSA requires authorized_lab_frequencies=true")
+            if environment not in {"cabled", "shielded"}:
+                errors.append("5G NSA laboratory mode must be cabled or shielded")
         return errors
 
     def _validate_consistency(self, profile: dict[str, Any]) -> list[str]:
@@ -214,17 +232,21 @@ class ProfileConfigService:
                 valid_range = self.LTE_BAND_EARFCN_RANGES.get(band)
                 if valid_range is not None and earfcn not in valid_range:
                     errors.append(f"radio.earfcn is outside LTE band {band} downlink EARFCN range")
-        if profile_id == "5g-sa-x310":
-            amf = self.root / "deployments" / "5g-sa" / "open5gs" / "amf.yaml"
-            text = _read(amf)
-            for key in ("mcc", "mnc"):
-                if f"{key}: {network[key]}" not in text:
-                    errors.append(f"5g-sa Open5GS AMF {key.upper()} differs from profile")
-            if f"tac: {network['tac']}" not in text:
-                errors.append("5g-sa Open5GS AMF TAC differs from profile")
-            slice_cfg = network.get("slice", {})
-            if f"sst: {slice_cfg.get('sst')}" not in text or f"sd: {slice_cfg.get('sd')}" not in text:
-                errors.append("5g-sa Open5GS AMF slice differs from profile")
+        if profile_id == "5g-nsa-x310":
+            if radio.get("device") != "x300":
+                errors.append("radio.device must be x300 for the current X310 NSA runtime")
+            if radio.get("lte_band") != 7:
+                errors.append("radio.lte_band must be 7 for the current NSA anchor")
+            if radio.get("nr_band") != 3:
+                errors.append("radio.nr_band must be 3 for the current NSA secondary carrier")
+            if radio.get("subcarrier_spacing_khz") != 15:
+                errors.append("radio.subcarrier_spacing_khz must be 15 for the current NSA runtime")
+            if _is_int(radio.get("earfcn"), 0, 100000) and int(radio["earfcn"]) not in self.LTE_BAND_EARFCN_RANGES[7]:
+                errors.append("radio.earfcn is outside LTE band 7 downlink EARFCN range")
+            if _is_int(radio.get("nr_dl_arfcn"), 0, 1000000):
+                nr_arfcn = int(radio["nr_dl_arfcn"])
+                if not 361000 <= nr_arfcn <= 376000 or (nr_arfcn - 361000) % 20:
+                    errors.append("radio.nr_dl_arfcn must use the NR n3 100 kHz raster (361000..376000)")
         return errors
 
     def _planned_changes(self, profile: dict[str, Any]) -> list[PlannedChange]:
@@ -233,10 +255,14 @@ class ProfileConfigService:
             return self._changes_5g_sa(profile)
         if profile_id == "5g-sa-x310":
             return self._changes_5g_sa_x310(profile)
+        if profile_id == "5g-nsa-x310":
+            return self._changes_5g_nsa_x310(profile)
         if profile_id == "5g-vonr":
             return self._changes_5g_vonr(profile)
         if profile_id == "4g-volte-sim":
             return self._changes_4g_volte_sim(profile)
+        if profile_id == "4g-lte-sim":
+            return self._changes_4g_lte_sim(profile)
         if profile_id == "4g-lte-x310":
             return self._changes_4g_lte_x310(profile)
         raise ProfileConfigError(404, "PROFILE_NOT_FOUND", f"Unknown profile: {profile_id}")
@@ -262,15 +288,80 @@ class ProfileConfigService:
     def _changes_5g_sa_x310(self, profile: dict[str, Any]) -> list[PlannedChange]:
         n, c, r, safety = profile["network"], profile["core"], profile["radio"], profile["safety"]
         sl = n["slice"]
+        sample_rates = {5.0: 15.36, 10.0: 15.36, 15.0: 23.04, 20.0: 23.04, 40.0: 46.08, 50.0: 61.44, 100.0: 122.88}
+        sample_rate = sample_rates[float(r["bandwidth_mhz"])]
         env = _update_env(_read(self.root / "deployments/5g-sa-x310/.env"), {
             "AMF_ADDR": c["amf_addr"], "GNB_BIND_ADDR": c["gnb_bind_addr"], "N3_BIND_ADDR": c["n3_bind_addr"],
             "USRP_ADDR": r["usrp_addr"], "USRP_TYPE": r["device"], "USRP_CLOCK_SOURCE": r["clock_source"], "USRP_TIME_SOURCE": r["time_source"],
             "MCC": n["mcc"], "MNC": n["mnc"], "TAC": n["tac"], "SST": sl["sst"], "SD": sl["sd"],
-            "CHANNEL_BANDWIDTH_MHZ": r["bandwidth_mhz"], "DL_ARFCN": r["dl_arfcn"], "NR_BAND": r["band"], "TX_GAIN": r["tx_gain"], "RX_GAIN": r["rx_gain"],
+            "CHANNEL_BANDWIDTH_MHZ": r["bandwidth_mhz"], "SAMPLE_RATE_MHZ": sample_rate, "DL_ARFCN": r["dl_arfcn"], "NR_BAND": r["band"], "TX_GAIN": r["tx_gain"], "RX_GAIN": r["rx_gain"],
             "MAXIMUM_DURATION_SECONDS": safety["maximum_duration_seconds"], "LAIN5G_ALLOW_5G_RF_START": "false",
         })
-        channel = _dumps_yaml({"nr_band": r["band"], "dl_arfcn": r["dl_arfcn"], "channel_bandwidth_mhz": r["bandwidth_mhz"], "common_scs": 30, "duplex_mode": None, "authorized_lab_frequency": False, "operator_note": ""})
-        return [self._change("deployments/5g-sa-x310/.env", env), self._change("deployments/5g-sa-x310/rf/channel-plan.yaml", channel)]
+        channel_rel = "deployments/5g-sa-x310/rf/channel-plan.yaml"
+        channel_data = _loads_yaml(_read(self.root / channel_rel))
+        channel_data.update({"nr_band": r["band"], "dl_arfcn": r["dl_arfcn"], "channel_bandwidth_mhz": r["bandwidth_mhz"], "authorized_lab_frequency": safety["authorization_confirmed"], "operator_note": safety["operator_note"]})
+        safety_rel = "deployments/5g-sa-x310/rf/safety-manifest.yaml"
+        safety_data = _loads_yaml(_read(self.root / safety_rel))
+        safety_data.update({
+            "lab_mode": safety["environment"], "authorization_confirmed": safety["authorization_confirmed"],
+            "antenna_connected": safety["antenna_connected"], "attenuation_db": safety["attenuation_db"],
+            "shielded_environment": safety["shielded_environment"], "maximum_duration_seconds": safety["maximum_duration_seconds"],
+            "auto_stop": safety["auto_stop"], "capture_logs": True, "operator_note": safety["operator_note"],
+        })
+        return [
+            self._change("deployments/5g-sa-x310/.env", env),
+            self._change("deployments/5g-sa-x310/open5gs/amf.yaml", _patch_5g_amf(_read(self.root / "deployments/5g-sa-x310/open5gs/amf.yaml"), n)),
+            self._change("deployments/5g-sa-x310/open5gs/smf.yaml", _patch_5g_smf(_read(self.root / "deployments/5g-sa-x310/open5gs/smf.yaml"), n["dnn"], None, sl)),
+            self._change(channel_rel, _dumps_yaml(channel_data)),
+            self._change(safety_rel, _dumps_yaml(safety_data)),
+        ]
+
+    def _changes_5g_nsa_x310(self, profile: dict[str, Any]) -> list[PlannedChange]:
+        n, core, ran, radio = profile["network"], profile["core"], profile["ran"], profile["radio"]
+        subscriber, safety = profile["subscriber"], profile["safety"]
+        common_env = _update_env(_read(self.root / "deployments/4g-volte/common/.env"), {
+            "MCC": n["mcc"], "MNC": n["mnc"], "TAC": n["tac"], "APN_INTERNET": n["apn_internet"], "SUBSCRIBER_IMSI": subscriber["imsi"],
+        })
+        nsa_env = _update_env(_read(self.root / "deployments/5g-nsa-x310/.env"), {
+            "USRP_ADDR": radio["usrp_addr"], "USRP_TYPE": radio["device"], "RF_DURATION_SECONDS": safety["maximum_duration_seconds"],
+            "LAIN5G_ALLOW_5G_NSA_RF_START": "false",
+        })
+        enb_rel = "deployments/5g-nsa-x310/ran/enb.conf"
+        enb = _patch_enb_conf(
+            _read(self.root / enb_rel), n, core["mme_addr"], ran["enb_bind_addr"], radio["earfcn"], radio["tx_gain"], radio["rx_gain"],
+            radio["bandwidth_mhz"], radio["usrp_addr"], radio["device"], radio["clock_source"], radio["time_source"],
+        )
+        rr_rel = "deployments/5g-nsa-x310/ran/rr.conf"
+        rr = _patch_nsa_rr_conf(_read(self.root / rr_rel), n["tac"], radio["earfcn"], radio["nr_dl_arfcn"], radio["nr_band"])
+        channel_rel = "deployments/5g-nsa-x310/rf/channel-plan.yaml"
+        channel = _loads_yaml(_read(self.root / channel_rel))
+        lte_dl, lte_ul = _lte_band7_frequencies_mhz(radio["earfcn"])
+        nr_dl, nr_ul = _nr_n3_frequencies_mhz(radio["nr_dl_arfcn"])
+        channel.update({
+            "mode": "NSA_EN_DC_EXPERIMENTAL", "lte_band": radio["lte_band"], "lte_dl_earfcn": radio["earfcn"],
+            "lte_bandwidth_mhz": radio["bandwidth_mhz"], "lte_downlink_frequency_mhz": lte_dl, "lte_uplink_frequency_mhz": lte_ul,
+            "nr_band": radio["nr_band"], "nr_dl_arfcn": radio["nr_dl_arfcn"], "nr_bandwidth_mhz": radio["bandwidth_mhz"],
+            "nr_downlink_frequency_mhz": nr_dl, "nr_uplink_frequency_mhz": nr_ul, "subcarrier_spacing_khz": radio["subcarrier_spacing_khz"],
+            "rf_channels": 2, "authorized_lab_frequencies": safety["authorized_lab_frequencies"], "operator_note": safety["operator_note"],
+        })
+        safety_rel = "deployments/5g-nsa-x310/rf/safety-manifest.yaml"
+        manifest = _loads_yaml(_read(self.root / safety_rel))
+        manifest.update({
+            "authorization_confirmed": safety["authorization_confirmed"], "auto_stop": safety["auto_stop"], "capture_logs": True,
+            "maximum_duration_seconds": safety["maximum_duration_seconds"], "lab_mode": safety["environment"], "attenuation_db": safety["attenuation_db"],
+            "antenna_connected": safety["antenna_connected"], "nr_rf_path_connected": safety["nr_rf_path_connected"],
+            "shielded_environment": safety["shielded_environment"], "operator_note": safety["operator_note"],
+        })
+        return [
+            self._change("deployments/4g-volte/common/.env", common_env),
+            self._change("deployments/4g-volte/x310/open5gs/mme.yaml", _patch_4g_mme(_read(self.root / "deployments/4g-volte/x310/open5gs/mme.yaml"), n)),
+            self._change("deployments/4g-volte/x310/open5gs/pgwc.yaml", _patch_4g_pgwc(_read(self.root / "deployments/4g-volte/x310/open5gs/pgwc.yaml"), n)),
+            self._change("deployments/5g-nsa-x310/.env", nsa_env),
+            self._change(enb_rel, enb),
+            self._change(rr_rel, rr),
+            self._change(channel_rel, _dumps_yaml(channel)),
+            self._change(safety_rel, _dumps_yaml(manifest)),
+        ]
 
     def _changes_5g_vonr(self, profile: dict[str, Any]) -> list[PlannedChange]:
         n, c, s, ims = profile["network"], profile["core"], profile["subscriber"], profile["ims"]
@@ -290,11 +381,33 @@ class ProfileConfigService:
     def _changes_4g_volte_sim(self, profile: dict[str, Any]) -> list[PlannedChange]:
         return self._changes_4g(profile, "sim", "10.41.0.40")
 
+    def _changes_4g_lte_sim(self, profile: dict[str, Any]) -> list[PlannedChange]:
+        n, core, ran, subscriber = profile["network"], profile["core"], profile["ran"], profile["subscriber"]
+        env = _update_env(_read(self.root / "deployments/4g-volte/common/.env"), {
+            "MCC": n["mcc"], "MNC": n["mnc"], "TAC": n["tac"], "APN_INTERNET": n["apn_internet"], "SUBSCRIBER_IMSI": subscriber["imsi"],
+        })
+        enb_rel = "deployments/4g-lte-sim/ran/enb.conf"
+        ue_rel = "deployments/4g-lte-sim/ran/ue.conf"
+        return [
+            self._change("deployments/4g-volte/common/.env", env),
+            self._change("deployments/4g-lte-sim/open5gs/mme.yaml", _patch_4g_mme(_read(self.root / "deployments/4g-lte-sim/open5gs/mme.yaml"), n)),
+            self._change("deployments/4g-lte-sim/open5gs/pgwc.yaml", _patch_4g_pgwc(_read(self.root / "deployments/4g-lte-sim/open5gs/pgwc.yaml"), n)),
+            self._change(enb_rel, _patch_enb_conf(_read(self.root / enb_rel), n, core["mme_addr"], ran["enb_bind_addr"], ran["dl_earfcn"], ran["tx_gain"], ran["rx_gain"])),
+            self._change(ue_rel, _patch_ue_conf(_read(self.root / ue_rel), n, subscriber["imsi"], ran["dl_earfcn"])),
+        ]
+
     def _changes_4g_lte_x310(self, profile: dict[str, Any]) -> list[PlannedChange]:
         n, core, ran, r, safety = profile["network"], profile["core"], profile["ran"], profile["radio"], profile["safety"]
+        subscriber, ims = profile["subscriber"], profile["ims"]
+        env = _update_env(_read(self.root / "deployments/4g-volte/common/.env"), {
+            "MCC": n["mcc"], "MNC": n["mnc"], "TAC": n["tac"], "APN_INTERNET": n["apn_internet"], "APN_IMS": n["apn_ims"],
+            "SUBSCRIBER_IMSI": subscriber["imsi"], "SUBSCRIBER_MSISDN": subscriber["msisdn"], "IMS_DOMAIN": ims["domain"],
+        })
         enb_rel = "deployments/4g-volte/x310/ran/enb.conf"
-        enb = _patch_enb_conf(_read(self.root / enb_rel), n, core["mme_addr"], ran["enb_bind_addr"], r["earfcn"], r["tx_gain"], r["rx_gain"], r["bandwidth_mhz"], r.get("usrp_addr"))
-        channel = _dumps_yaml({"band": r["lte_band"], "earfcn": r["earfcn"], "downlink_frequency_hz": None, "uplink_frequency_hz": None, "bandwidth_mhz": r["bandwidth_mhz"], "tx_gain": r["tx_gain"], "rx_gain": r["rx_gain"], "sample_rate": None})
+        enb = _patch_enb_conf(_read(self.root / enb_rel), n, core["mme_addr"], ran["enb_bind_addr"], r["earfcn"], r["tx_gain"], r["rx_gain"], r["bandwidth_mhz"], r.get("usrp_addr"), r.get("device"), r.get("clock_source"), r.get("time_source"))
+        channel_rel = "deployments/4g-volte/x310/rf/channel-plan.yaml"
+        channel_data = _loads_yaml(_read(self.root / channel_rel))
+        channel_data.update({"band": r["lte_band"], "earfcn": r["earfcn"], "bandwidth_mhz": r["bandwidth_mhz"], "tx_gain": r["tx_gain"], "rx_gain": r["rx_gain"]})
         manifest = _dumps_yaml({
             "lab_mode": safety["environment"],
             "authorization_confirmed": safety["authorization_confirmed"],
@@ -307,8 +420,11 @@ class ProfileConfigService:
             "operator_note": safety["operator_note"],
         })
         return [
+            self._change("deployments/4g-volte/common/.env", env),
+            self._change("deployments/4g-volte/x310/open5gs/mme.yaml", _patch_4g_mme(_read(self.root / "deployments/4g-volte/x310/open5gs/mme.yaml"), n)),
+            self._change("deployments/4g-volte/x310/open5gs/pgwc.yaml", _patch_4g_pgwc(_read(self.root / "deployments/4g-volte/x310/open5gs/pgwc.yaml"), n)),
             self._change(enb_rel, enb),
-            self._change("deployments/4g-volte/x310/rf/channel-plan.yaml", channel),
+            self._change(channel_rel, _dumps_yaml(channel_data)),
             self._change("deployments/4g-volte/x310/rf/safety-manifest.yaml", manifest),
         ]
 
@@ -343,15 +459,22 @@ class ProfileConfigService:
         return backup_dir
 
     def _change_payload(self, change: PlannedChange) -> dict[str, Any]:
+        before = _redact_env_secrets(change.before, self.SECRET_KEYS)
+        after = _redact_env_secrets(change.after, self.SECRET_KEYS)
         return {
             "path": self._rel(change.path),
             "changed": change.before != change.after,
-            "diff": "".join(difflib.unified_diff(change.before.splitlines(True), change.after.splitlines(True), fromfile=f"a/{self._rel(change.path)}", tofile=f"b/{self._rel(change.path)}")),
+            "diff": "".join(difflib.unified_diff(before.splitlines(True), after.splitlines(True), fromfile=f"a/{self._rel(change.path)}", tofile=f"b/{self._rel(change.path)}")),
         }
 
 
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8") if path.exists() else ""
+
+
+def _redact_env_secrets(text: str, secret_keys: set[str]) -> str:
+    pattern = re.compile(rf"^({'|'.join(re.escape(key) for key in sorted(secret_keys))})=.*$", re.MULTILINE)
+    return pattern.sub(r"\1=<redacted>", text)
 
 
 def _is_int(value: Any, minimum: int, maximum: int) -> bool:
@@ -360,6 +483,14 @@ def _is_int(value: Any, minimum: int, maximum: int) -> bool:
     except (TypeError, ValueError):
         return False
     return minimum <= number <= maximum
+
+
+def _is_finite_number(value: Any, minimum: float, maximum: float) -> bool:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return False
+    return math.isfinite(number) and minimum <= number <= maximum
 
 
 def _is_ip(value: str) -> bool:
@@ -534,10 +665,10 @@ def _patch_4g_mme(text: str, n: dict[str, Any]) -> str:
 
 def _patch_4g_pgwc(text: str, n: dict[str, Any]) -> str:
     text = re.sub(r"dnn:\s*internet\b", f"dnn: {n['apn_internet']}", text)
-    return re.sub(r"dnn:\s*ims\b", f"dnn: {n['apn_ims']}", text)
+    return re.sub(r"dnn:\s*ims\b", f"dnn: {n['apn_ims']}", text) if "apn_ims" in n else text
 
 
-def _patch_enb_conf(text: str, n: dict[str, Any], mme_addr: str, bind_addr: str, earfcn: Any, tx_gain: Any, rx_gain: Any, bandwidth_mhz: Any = None, usrp_addr: Any = None) -> str:
+def _patch_enb_conf(text: str, n: dict[str, Any], mme_addr: str, bind_addr: str, earfcn: Any, tx_gain: Any, rx_gain: Any, bandwidth_mhz: Any = None, usrp_addr: Any = None, usrp_type: Any = None, clock_source: Any = None, time_source: Any = None) -> str:
     replacements = {"mcc": n["mcc"], "mnc": n["mnc"], "mme_addr": mme_addr, "gtp_bind_addr": bind_addr, "s1c_bind_addr": bind_addr, "dl_earfcn": earfcn, "tx_gain": tx_gain, "rx_gain": rx_gain}
     if bandwidth_mhz is not None:
         replacements["n_prb"] = _srsran_4g_n_prb(bandwidth_mhz)
@@ -545,6 +676,12 @@ def _patch_enb_conf(text: str, n: dict[str, Any], mme_addr: str, bind_addr: str,
         text = _replace_all(text, rf"^{key}\s*=.*$", f"{key} = {value}")
     if usrp_addr:
         text = re.sub(r"addr=[0-9.]+", f"addr={usrp_addr}", text)
+    if usrp_type:
+        text = re.sub(r"type=[^,\s]+", f"type={usrp_type}", text)
+    if clock_source:
+        text = re.sub(r"clock=[^,\s]+", f"clock={clock_source}", text)
+    if time_source:
+        text = re.sub(r"time_source=[^,\s]+", f"time_source={time_source}", text)
     return text
 
 
@@ -574,3 +711,20 @@ def _patch_ue_conf(text: str, n: dict[str, Any], imsi: str, earfcn: Any) -> str:
     for key, value in {"dl_earfcn": earfcn, "imsi": imsi, "apn": n["apn_internet"]}.items():
         text = _replace_all(text, rf"^{key}\s*=.*$", f"{key} = {value}")
     return text
+
+
+def _patch_nsa_rr_conf(text: str, tac: Any, lte_earfcn: Any, nr_arfcn: Any, nr_band: Any) -> str:
+    text = re.sub(r"(tac\s*=\s*)0x[0-9A-Fa-f]+", rf"\g<1>0x{int(tac):04X}", text)
+    text = _replace_all(text, r"^\s*dl_earfcn\s*=.*$", f"    dl_earfcn = {lte_earfcn};")
+    text = _replace_all(text, r"^\s*dl_arfcn\s*=.*$", f"    dl_arfcn = {nr_arfcn};")
+    return _replace_all(text, r"^\s*band\s*=.*$", f"    band = {nr_band};")
+
+
+def _lte_band7_frequencies_mhz(earfcn: Any) -> tuple[float, float]:
+    offset = int(earfcn) - 2750
+    return round(2620.0 + 0.1 * offset, 3), round(2500.0 + 0.1 * offset, 3)
+
+
+def _nr_n3_frequencies_mhz(arfcn: Any) -> tuple[float, float]:
+    downlink = int(arfcn) * 0.005
+    return round(downlink, 3), round(downlink - 95.0, 3)

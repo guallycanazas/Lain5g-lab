@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     scenario: str = Field(default="5g-sa", alias="LAIN5G_SCENARIO")
     dry_run: bool = Field(default=False, alias="LAIN5G_DRY_RUN")
     command_timeout: int = Field(default=300, ge=1, le=3600, alias="LAIN5G_COMMAND_TIMEOUT")
+    image_pull_timeout: int = Field(default=3600, ge=30, le=7200, alias="LAIN5G_IMAGE_PULL_TIMEOUT")
     log_tail_lines: int = Field(default=500, ge=1, le=5000, alias="LAIN5G_LOG_TAIL_LINES")
     cors_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"],
@@ -27,6 +28,8 @@ class Settings(BaseSettings):
     subscriber_secrets_visible: bool = Field(default=False, alias="LAIN5G_SUBSCRIBER_SECRETS_VISIBLE")
     subscriber_operation_timeout: int = Field(default=15, ge=1, le=120, alias="LAIN5G_SUBSCRIBER_OPERATION_TIMEOUT")
     open5gs_docker_network: str = Field(default="lain5g-lab-5g-sa-core", alias="LAIN5G_OPEN5GS_DOCKER_NETWORK")
+    rf_web_control_enabled: bool = Field(default=False, alias="LAIN5G_RF_WEB_CONTROL_ENABLED")
+    image_pull_enabled: bool = Field(default=True, alias="LAIN5G_IMAGE_PULL_ENABLED")
 
     model_config = SettingsConfigDict(
         env_file="backend/.env",

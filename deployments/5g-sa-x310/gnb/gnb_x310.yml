@@ -19,10 +19,10 @@ cu_up:
 
 ru_sdr:
   device_driver: uhd
-  device_args: type=${USRP_TYPE},addr=${USRP_ADDR}
+  device_args: type=${USRP_TYPE},addr=${USRP_ADDR},num_recv_frames=64,num_send_frames=64
   clock: ${USRP_CLOCK_SOURCE}
   sync: ${USRP_TIME_SOURCE}
-  srate: 23.04
+  srate: ${SAMPLE_RATE_MHZ}
   tx_gain: ${TX_GAIN}
   rx_gain: ${RX_GAIN}
 
@@ -37,4 +37,4 @@ cell_cfg:
 
 log:
   filename: /var/log/srsran/gnb.log
-  all_level: info
+  all_level: warning

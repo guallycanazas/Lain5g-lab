@@ -59,6 +59,9 @@ def test_x310_rf_start_requires_guardrails():
     assert "preflight.sh" in start_enb
     assert "maximum_duration_seconds" in start_enb
     assert "stop enb-x310" in start_enb
+    assert 'grep -Fxq "run_id=$run_id"' in start_enb
+    assert "sleep 5" in start_enb
+    assert ".State.Running" in start_enb
     assert "--network host" in uhd_check
     assert "uhd_usrp_probe" in uhd_check
     assert "uhd_find_devices" in hardware_check
@@ -69,10 +72,17 @@ def test_x310_uses_profile_specific_addresses():
     enb = (DEPLOY / "x310" / "ran" / "enb.conf").read_text(encoding="utf-8")
     assert "./open5gs/mme.yaml" in compose
     assert "./ims/pcscf/kamailio.cfg" in compose
-    assert "s1c_bind_addr = 10.42.0.1" in enb
+    assert "mme_addr = 172.22.0.9" in enb
+    assert "s1c_bind_addr = 172.22.0.1" in enb
+    assert "gtp_bind_addr = 172.22.0.1" in enb
     for path in (DEPLOY / "x310" / "open5gs").glob("*.yaml"):
         text = path.read_text(encoding="utf-8")
         assert "10.41." not in text
+
+
+def test_x310_supports_ims_signaling_bearer():
+    rb = (DEPLOY / "x310" / "ran" / "rb.conf").read_text(encoding="utf-8")
+    assert "qci = 5;" in rb
 
 
 def test_secret_values_are_not_committed_in_env_example():

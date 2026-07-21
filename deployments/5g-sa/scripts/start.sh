@@ -21,6 +21,22 @@ if [ "${LAIN5G_DRY_RUN:-false}" != "true" ]; then
     echo "SUBSCRIBER_KEY and SUBSCRIBER_OPC must be set in deployments/5g-sa/.env before starting." >&2
     exit 2
   fi
+
+  x310_project="lain5g-lab-5g-sa-x310"
+  x310_network="lain5g-lab-5g-sa-x310-core"
+  if [ -n "$(docker ps -aq --filter "label=com.docker.compose.project=$x310_project")" ] || docker network inspect "$x310_network" >/dev/null 2>&1; then
+    echo "Switching from 5G SA X310 to 5G SA simulation..."
+    "$repo_dir/deployments/5g-sa-x310/scripts/stop.sh"
+    echo "5G SA X310 stopped; volumes and data were preserved."
+  fi
+
+  project_name="lain5g-lab-5g-sa"
+  existing_containers="$(docker ps -aq --filter "label=com.docker.compose.project=$project_name")"
+  running_containers="$(docker ps -q --filter "label=com.docker.compose.project=$project_name")"
+  if [ -n "$existing_containers" ] && [ -z "$running_containers" ]; then
+    (cd "$scenario_dir" && docker compose --env-file .env -f docker-compose.yml down --remove-orphans)
+    echo "Removed stopped 5G SA containers with stale network references."
+  fi
 fi
 
 mkdir -p "$run_dir/logs"

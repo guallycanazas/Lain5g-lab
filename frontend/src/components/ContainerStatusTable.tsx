@@ -1,10 +1,8 @@
 import type { ContainerStatus } from '../types/deployment';
 import { StatusBadge } from './StatusBadge';
 
-const expected = ['mongo', 'nrf', 'amf', 'smf', 'upf', 'ausf', 'udm', 'udr', 'pcf', 'gnb', 'ue'];
-
 export function ContainerStatusTable({ containers }: { containers: ContainerStatus[] }) {
-  const byService = new Map(containers.map((container) => [container.service, container]));
+  if (!containers.length) return <div className="empty-state"><h3>Deployment stopped</h3><p>Service telemetry will become available after startup.</p></div>;
   return (
     <div className="table-wrap">
       <table>
@@ -12,15 +10,14 @@ export function ContainerStatusTable({ containers }: { containers: ContainerStat
           <tr><th>Componente</th><th>Servicio</th><th>Estado</th><th>Identificador</th><th>Observaciones</th></tr>
         </thead>
         <tbody>
-          {expected.map((service) => {
-            const container = byService.get(service);
+          {containers.map((container) => {
             return (
-              <tr key={service}>
-                <td>{service.toUpperCase()}</td>
-                <td>{container?.service || service}</td>
-                <td>{container ? <StatusBadge status={container.running ? 'running' : 'stopped'} /> : <StatusBadge status="unknown" />}</td>
-                <td>{container?.name || 'No detectado'}</td>
-                <td>{container ? container.status : 'La API no reportó este contenedor'}</td>
+              <tr key={container.name}>
+                <td>{(container.service || container.name).toUpperCase()}</td>
+                <td>{container.service || 'Unmapped service'}</td>
+                <td><StatusBadge status={container.running ? 'running' : 'stopped'} /></td>
+                <td><code>{container.name}</code></td>
+                <td>{container.status}</td>
               </tr>
             );
           })}

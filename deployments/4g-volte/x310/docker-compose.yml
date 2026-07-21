@@ -26,6 +26,7 @@ services:
 
   webui:
     image: lain5g/open5gs-webui:local
+    profiles: ["webui"]
     container_name: lain5g-lab-4g-lte-x310-webui
     environment:
       DB_URI: mongodb://mongo/open5gs
@@ -164,7 +165,9 @@ services:
     ulimits:
       rtprio: 99
       memlock: -1
-    command: ["srsenb", "/etc/srsran/enb.conf", "--enb_files.rr_config=/etc/srsran/rr.conf", "--enb_files.sib_config=/etc/srsran/sib.conf", "--enb_files.rb_config=/etc/srsran/rb.conf"]
+    environment:
+      RF_DURATION_SECONDS: ${LAIN5G_RF_DURATION_SECONDS:-60}
+    command: ["bash", "-lc", "exec timeout --signal=TERM $${RF_DURATION_SECONDS}s srsenb /etc/srsran/enb.conf --enb_files.rr_config=/etc/srsran/rr.conf --enb_files.sib_config=/etc/srsran/sib.conf --enb_files.rb_config=/etc/srsran/rb.conf"]
     depends_on: [mme]
     volumes:
       - ./ran/enb.conf:/etc/srsran/enb.conf:ro

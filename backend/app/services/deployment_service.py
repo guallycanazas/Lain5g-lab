@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import re
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from ..models.deployment import (
     CommandResult,
@@ -11,13 +13,17 @@ from ..models.deployment import (
     DeploymentStatus,
     DeploymentSummary,
     LogsResponse,
+    RfStartRequest,
 )
 from ..models.validation import ValidationReport
 from ..settings import Settings
 from .command_service import CommandService
-from .deployment_registry import DeploymentDefinition, get_deployment_definition, list_deployment_definitions
+from .deployment_registry import DeploymentDefinition, get_deployment_definition, list_catalog_deployment_definitions, list_deployment_definitions
 from .run_service import RunService
 from .validation_service import ValidationService
+
+if TYPE_CHECKING:
+    from .preparation_service import PreparationService
 
 
 CONTAINER_RE = re.compile(r"^(?P<name>lain5g-lab-[a-z0-9-]+-(?P<service>[a-z0-9-]+))\s+")
@@ -48,14 +54,16 @@ class DeploymentService:
         command_service: CommandService,
         run_service: RunService,
         validation_service: ValidationService,
+        preparation_service: PreparationService | None = None,
     ):
         self.settings = settings
         self.command_service = command_service
         self.run_service = run_service
         self.validation_service = validation_service
+        self.preparation_service = preparation_service
 
     def list_deployments(self) -> list[DeploymentSummary]:
-        return [self._summary(definition) for definition in list_deployment_definitions()]
+        return [self._summary(definition) for definition in list_catalog_deployment_definitions()]
 
     def get_deployment(self, scenario: str) -> DeploymentSummary:
         return self._summary(self._definition(scenario))
@@ -63,6 +71,7 @@ class DeploymentService:
     def start(self, scenario: str) -> DeploymentActionResponse:
         definition = self._definition(scenario)
         self._ensure_action(definition, "start")
+        self._ensure_components(definition)
         self._ensure_no_conflict(definition)
         return self._script_action(definition, "start", "DEPLOYMENT_START_FAILED", f"{definition.name} could not be started.")
 
@@ -74,24 +83,74 @@ class DeploymentService:
     def restart(self, scenario: str) -> DeploymentActionResponse:
         definition = self._definition(scenario)
         self._ensure_action(definition, "restart")
+        self._ensure_components(definition)
         self._ensure_no_conflict(definition)
         return self._script_action(definition, "restart", "DEPLOYMENT_RESTART_FAILED", f"{definition.name} could not be restarted.")
 
     def hardware_check(self, scenario: str) -> DeploymentActionResponse:
         definition = self._definition(scenario)
         self._ensure_action(definition, "hardware-check")
-        return self._x310_host_network_action(definition, "hardware-check", "X310_HARDWARE_CHECK_FAILED", "X310 hardware check failed.", "hardware-check.sh")
+        self._ensure_components(definition)
+        if scenario == "4g-lte-x310":
+            return self._x310_host_network_action(definition, "hardware-check", "X310_HARDWARE_CHECK_FAILED", "X310 hardware check failed.", "hardware-check.sh")
+        return self._script_action(definition, "hardware-check", "X310_HARDWARE_CHECK_FAILED", "X310 hardware check failed.")
 
     def preflight(self, scenario: str) -> DeploymentActionResponse:
         definition = self._definition(scenario)
         self._ensure_action(definition, "preflight")
+        self._ensure_components(definition)
         return self._script_action(definition, "preflight", "X310_PREFLIGHT_FAILED", "X310 preflight failed.")
 
     def start_epc(self, scenario: str) -> DeploymentActionResponse:
         definition = self._definition(scenario)
         self._ensure_action(definition, "start-epc")
+        self._ensure_components(definition, core_only=True)
         self._ensure_no_conflict(definition)
         return self._script_action(definition, "start-epc", "X310_EPC_START_FAILED", "X310 EPC could not be started.", script="start-epc")
+
+    def start_core(self, scenario: str) -> DeploymentActionResponse:
+        definition = self._definition(scenario)
+        self._ensure_action(definition, "start-core")
+        self._ensure_components(definition, core_only=True)
+        self._ensure_no_conflict(definition)
+        if not definition.core_start_script:
+            raise ValueError(f"Core start is not configured for {scenario}")
+        return self._script_action(definition, "start-core", "X310_CORE_START_FAILED", f"{definition.name} core could not be started.", script=definition.core_start_script)
+
+    def start_rf(self, scenario: str, payload: RfStartRequest) -> DeploymentActionResponse:
+        definition = self._definition(scenario)
+        self._ensure_action(definition, "start-rf")
+        if not definition.rf_start_script or not definition.rf_guard_variable:
+            raise ValueError(f"RF start is not configured for {scenario}")
+        expected_phrase = f"START {scenario.upper()} RF"
+        if payload.execute and payload.confirmation_phrase != expected_phrase:
+            raise ValueError(f"Confirmation phrase must be: {expected_phrase}")
+
+        script_path = str((self.settings.project_root / definition.scripts_dir / f"{definition.rf_start_script}.sh").resolve())
+        command = [
+            "env",
+            f"{definition.rf_guard_variable}=true",
+            f"LAIN5G_RF_DURATION_SECONDS={payload.requested_duration_seconds}",
+            f"LAIN5G_RF_OPERATOR_NOTE={payload.operator_note.strip() or 'dry-run'}",
+            script_path,
+        ]
+        if not payload.execute:
+            result = self.command_service.execute_command(command, cwd=definition.deployment_path, dry_run=True)
+            return DeploymentActionResponse(id=scenario, action="start-rf", status="dry_run", command=result, message="Guarded RF start plan generated")
+        if not self.settings.rf_web_control_enabled:
+            raise ValueError("RF web control is disabled by the local operator configuration")
+
+        self._ensure_components(definition)
+        self._ensure_no_conflict(definition)
+        if not definition.core_start_script:
+            raise ValueError(f"Core start is not configured for {scenario}")
+        core_result = self._execute_script(definition, definition.core_start_script)
+        if self._failed(core_result):
+            raise DeploymentCommandError("X310_CORE_START_FAILED", f"{definition.name} core could not be started.", core_result)
+        result = self.command_service.execute_command(command, cwd=definition.deployment_path, dry_run=False)
+        if self._failed(result):
+            raise DeploymentCommandError("X310_RF_START_FAILED", f"{definition.name} guarded RF session could not be started.", result)
+        return DeploymentActionResponse(id=scenario, action="start-rf", status=self.get_status(scenario).status, command=result, message="Guarded RF session started with container-enforced auto-stop")
 
     def emergency_stop(self, scenario: str) -> DeploymentActionResponse:
         definition = self._definition(scenario)
@@ -123,7 +182,8 @@ class DeploymentService:
         if container is None and tail is None:
             result = self._execute_script(definition, "logs")
         else:
-            command = ["docker", "compose", "--env-file", self._env_file(definition), "-f", "docker-compose.yml", "--profile", "sip", "logs", "--no-color", "--tail", str(resolved_tail)]
+            profile = "rf" if definition.rf_capable else "sip"
+            command = ["docker", "compose", "--env-file", self._env_file(definition), "-f", "docker-compose.yml", "--profile", profile, "logs", "--no-color", "--tail", str(resolved_tail)]
             if container:
                 command.append(container)
             result = self.command_service.execute_command(command, cwd=definition.deployment_path)
@@ -189,6 +249,8 @@ class DeploymentService:
 
     @staticmethod
     def _env_file(definition: DeploymentDefinition) -> str:
+        if definition.id == "4g-lte-sim":
+            return "../4g-volte/common/.env"
         return "../common/.env" if definition.id in {"4g-volte-sim", "4g-lte-x310"} else ".env"
 
     @staticmethod
@@ -197,6 +259,28 @@ class DeploymentService:
 
     @staticmethod
     def _parse_containers(stdout: str) -> list[ContainerStatus]:
+        parsed_items: list[dict[str, object]] = []
+        try:
+            parsed = json.loads(stdout)
+            parsed_items = parsed if isinstance(parsed, list) else [parsed] if isinstance(parsed, dict) else []
+        except json.JSONDecodeError:
+            for line in stdout.splitlines():
+                try:
+                    item = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(item, dict):
+                    parsed_items.append(item)
+        if parsed_items:
+            return [
+                ContainerStatus(
+                    name=str(item.get("Name") or item.get("Names") or "unknown"),
+                    service=str(item.get("Service")) if item.get("Service") else None,
+                    status=str(item.get("Status") or item.get("State") or "unknown"),
+                    running=str(item.get("State", "")).lower() == "running",
+                )
+                for item in parsed_items
+            ]
         containers: list[ContainerStatus] = []
         for line in stdout.splitlines():
             match = CONTAINER_RE.match(line)
@@ -236,6 +320,14 @@ class DeploymentService:
         for other in list_deployment_definitions():
             if other.id == definition.id:
                 continue
+            if {other.id, definition.id} == {"5g-sa", "5g-sa-x310"}:
+                continue
             status = self.get_status(other.id).status
             if status in {"running", "partial"}:
                 raise DeploymentConflictError("Another laboratory scenario is currently running.", active_scenario=other.id)
+
+    def _ensure_components(self, definition: DeploymentDefinition, core_only: bool = False) -> None:
+        if self.preparation_service is None or self.settings.dry_run:
+            return
+        profile_id = "5g-vonr" if definition.id == "5g-vonr-sim" else definition.id
+        self.preparation_service.ensure_ready(profile_id, core_only)

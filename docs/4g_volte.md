@@ -4,6 +4,7 @@ El escenario `deployments/4g-volte` agrega una ruta 4G aislada del despliegue `5
 
 Perfiles disponibles:
 
+- `4g-lte-sim`: EPC + srsENB + srsUE por ZMQ, sin servicios IMS.
 - `4g-volte-sim`: EPC + IMS + srsRAN 4G en modo software.
 - `4g-lte-x310`: EPC + IMS + eNB srsRAN 4G para USRP X310, con RF bloqueada por defecto.
 
@@ -12,8 +13,7 @@ Perfiles disponibles:
 - EPC 4G basado en Open5GS `v2.7.5`.
 - IMS mínimo con Kamailio `5.8.8` y base SQL inicial.
 - Provisionamiento de APN `internet` e `ims` para un suscriptor de laboratorio.
-- Validaciones estáticas y scripts operativos desde terminal.
-- Sin integración API/frontend para 4G en esta etapa.
+- Validaciones estáticas, scripts operativos y workspaces guiados en la API/frontend.
 
 ## Límites
 
@@ -33,6 +33,13 @@ nano deployments/4g-volte/common/.env
 Define claves de laboratorio para `SUBSCRIBER_KEY` y `SUBSCRIBER_OPC`. No uses IMSI, Ki, OPc ni MSISDN reales sin anonimizar.
 
 ## Comandos Principales
+
+```bash
+make build-4g-lte-sim
+make start-4g-lte-sim
+make validate-4g-lte-sim
+make stop-4g-lte-sim
+```
 
 ```bash
 make build-4g-volte-sim

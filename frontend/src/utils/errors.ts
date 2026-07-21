@@ -1,6 +1,11 @@
 import { ApiError } from '../types/api';
 
+function isNetworkConflict(error: unknown) {
+  return error instanceof ApiError && /pool overlaps|network conflict|address space/i.test(`${error.message} ${JSON.stringify(error.details)}`);
+}
+
 export function errorTitle(error: unknown): string {
+  if (isNetworkConflict(error)) return 'Docker network conflict';
   if (error instanceof ApiError) {
     if (error.status === 0) return 'Backend no disponible';
     if (error.status === 409) return 'Conflicto de estado';
@@ -13,6 +18,7 @@ export function errorTitle(error: unknown): string {
 }
 
 export function errorMessage(error: unknown): string {
+  if (isNetworkConflict(error)) return 'The subnet requested by this deployment overlaps with another Docker network.';
   if (error instanceof ApiError) return error.message;
   if (error instanceof TypeError) return 'No se pudo conectar con la API.';
   if (error instanceof Error) return error.message;

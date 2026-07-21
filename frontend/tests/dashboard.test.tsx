@@ -4,76 +4,42 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardPage } from '../src/pages/DashboardPage';
 import { deploymentStatus, healthResponse, jsonResponse, validationReport, renderWithClient } from './testUtils';
 
+function stubDashboard(extra?: (url: string, init?: RequestInit) => Promise<Response> | undefined) {
+  vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => {
+    const overridden = extra?.(url, init); if (overridden) return overridden;
+    if (url.includes('/api/health')) return jsonResponse(healthResponse);
+    if (url.includes('/api/preparation/profiles/5g-sa')) return jsonResponse({ profile: '5g-sa', name: '5G SA simulado', rf_capable: false, core_only: false, ready: true, installed_count: 3, total_count: 3, images: [] });
+    if (url.includes('/status')) return jsonResponse(deploymentStatus);
+    if (url.includes('/validation/latest')) return jsonResponse(validationReport);
+    if (url.includes('/api/runs')) return jsonResponse([]);
+    return jsonResponse({});
+  }));
+}
+
 describe('DashboardPage', () => {
   beforeEach(() => vi.restoreAllMocks());
 
-  it('shows backend and deployment status plus action buttons', async () => {
-    vi.stubGlobal('fetch', vi.fn((url: string) => {
-      if (url.includes('/api/health')) return jsonResponse(healthResponse);
-      if (url.includes('/status')) return jsonResponse(deploymentStatus);
-      return jsonResponse({});
-    }));
-
+  it('shows operational summary from backend status and validation evidence', async () => {
+    stubDashboard();
     renderWithClient(<DashboardPage />);
-
-    expect(await screen.findByText('lain5g-lab-backend')).toBeInTheDocument();
-    await waitFor(() => expect(screen.getAllByText('Detenido').length).toBeGreaterThan(0));
-    expect(screen.getByRole('button', { name: 'Iniciar' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Detener' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Reiniciar' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Lain5G-Lab' })).toBeInTheDocument();
+    expect(screen.getByText('Active services')).toBeInTheDocument();
+    expect(screen.getByText('Validation pass rate')).toBeInTheDocument();
+    expect(screen.getByText('Deployment stopped')).toBeInTheDocument();
   });
 
-  it('starts deployment through the API and disables actions while loading', async () => {
-    vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => {
-      if (url.includes('/api/health')) return jsonResponse(healthResponse);
-      if (url.includes('/status')) return jsonResponse(deploymentStatus);
-      if (url.includes('/start') && init?.method === 'POST') return jsonResponse({ id: '5g-sa', action: 'start', status: 'running', message: 'ok', command: deploymentStatus.command });
-      return jsonResponse({});
-    }));
-
+  it('starts deployment through the existing API contract', async () => {
+    stubDashboard((url, init) => url.includes('/start') && init?.method === 'POST' ? jsonResponse({ id: '5g-sa', action: 'start', status: 'running', message: 'ok', command: deploymentStatus.command }) : undefined);
     renderWithClient(<DashboardPage />);
-    await userEvent.click(await screen.findByRole('button', { name: 'Iniciar' }));
-
+    await userEvent.click(await screen.findByRole('button', { name: 'Start' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/deployments/5g-sa/start', expect.objectContaining({ method: 'POST' })));
   });
 
-  it('stops deployment only after confirmation', async () => {
-    vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => {
-      if (url.includes('/api/health')) return jsonResponse(healthResponse);
-      if (url.includes('/status')) return jsonResponse(deploymentStatus);
-      if (url.includes('/stop') && init?.method === 'POST') return jsonResponse({ id: '5g-sa', action: 'stop', status: 'stopped', message: 'ok', command: deploymentStatus.command });
-      return jsonResponse({});
-    }));
-
+  it('requires confirmation before stopping deployment', async () => {
+    stubDashboard((url, init) => url.includes('/stop') && init?.method === 'POST' ? jsonResponse({ id: '5g-sa', action: 'stop', status: 'stopped', message: 'ok', command: deploymentStatus.command }) : undefined);
     renderWithClient(<DashboardPage />);
-    await userEvent.click(await screen.findByRole('button', { name: 'Detener' }));
-    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Detener' }));
-
+    await userEvent.click(await screen.findByRole('button', { name: 'Stop' }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Stop deployment' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/deployments/5g-sa/stop', expect.objectContaining({ method: 'POST' })));
-  });
-
-  it('runs validation and shows the returned status', async () => {
-    vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => {
-      if (url.includes('/api/health')) return jsonResponse(healthResponse);
-      if (url.includes('/status')) return jsonResponse(deploymentStatus);
-      if (url.includes('/validate') && init?.method === 'POST') return jsonResponse(validationReport);
-      return jsonResponse({});
-    }));
-
-    renderWithClient(<DashboardPage />);
-    await userEvent.click(await screen.findByRole('button', { name: 'Validar' }));
-
-    await waitFor(() => expect(document.body.textContent).toContain('run-valid'));
-  });
-
-  it('shows backend errors clearly', async () => {
-    vi.stubGlobal('fetch', vi.fn((url: string) => {
-      if (url.includes('/api/health')) return jsonResponse({ detail: { code: 'BACKEND_DOWN', message: 'No disponible' } }, 500);
-      return jsonResponse(deploymentStatus);
-    }));
-
-    renderWithClient(<DashboardPage />);
-
-    expect(await screen.findByText('Error del backend')).toBeInTheDocument();
   });
 });

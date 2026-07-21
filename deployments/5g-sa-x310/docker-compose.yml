@@ -74,7 +74,7 @@ services:
     container_name: lain5g-lab-5g-sa-x310-smf
     command: ["open5gs-smfd", "-c", "/etc/open5gs/smf.yaml"]
     depends_on: [nrf, upf]
-    volumes: ["../5g-sa/open5gs/smf.yaml:/etc/open5gs/smf.yaml:ro"]
+    volumes: ["./open5gs/smf.yaml:/etc/open5gs/smf.yaml:ro"]
     networks: { core: { ipv4_address: 10.20.0.4 } }
 
   amf:
@@ -82,7 +82,7 @@ services:
     container_name: lain5g-lab-5g-sa-x310-amf
     command: ["open5gs-amfd", "-c", "/etc/open5gs/amf.yaml"]
     depends_on: [nrf, ausf, udm, udr, pcf, smf]
-    volumes: ["../5g-sa/open5gs/amf.yaml:/etc/open5gs/amf.yaml:ro"]
+    volumes: ["./open5gs/amf.yaml:/etc/open5gs/amf.yaml:ro"]
     networks: { core: { ipv4_address: 10.20.0.5 } }
 
   gnb-x310:
@@ -109,14 +109,16 @@ services:
       SST: ${SST:-1}
       SD: ${SD:-000001}
       CHANNEL_BANDWIDTH_MHZ: ${CHANNEL_BANDWIDTH_MHZ:-10}
+      SAMPLE_RATE_MHZ: ${SAMPLE_RATE_MHZ:-15.36}
       DL_ARFCN: ${DL_ARFCN:-}
       NR_BAND: ${NR_BAND:-}
       TX_GAIN: ${TX_GAIN:-}
       RX_GAIN: ${RX_GAIN:-}
+      RF_DURATION_SECONDS: ${LAIN5G_RF_DURATION_SECONDS:-60}
     command:
       - bash
       - -lc
-      - envsubst < /etc/srsran/gnb_x310.yml > /tmp/gnb_x310.yml && exec gnb -c /tmp/gnb_x310.yml
+      - envsubst < /etc/srsran/gnb_x310.yml > /tmp/gnb_x310.yml && exec timeout --signal=TERM $${RF_DURATION_SECONDS}s gnb -c /tmp/gnb_x310.yml
     depends_on: [amf]
     volumes:
       - ./gnb/gnb_x310.yml:/etc/srsran/gnb_x310.yml:ro

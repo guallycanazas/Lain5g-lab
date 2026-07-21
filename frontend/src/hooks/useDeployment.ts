@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deploymentsApi } from '../services/deploymentsApi';
+import type { RfStartPayload } from '../types/deployment';
 
 export function useHealth() {
   return useQuery({ queryKey: ['health'], queryFn: deploymentsApi.health, refetchInterval: 10000 });
@@ -50,9 +51,11 @@ export function useScenarioActions(scenarioId: string) {
     stop: useMutation({ mutationFn: () => deploymentsApi.stop(scenarioId), onSuccess: invalidate }),
     restart: useMutation({ mutationFn: () => deploymentsApi.restart(scenarioId), onSuccess: invalidate }),
     validate: useMutation({ mutationFn: () => deploymentsApi.validate(scenarioId), onSuccess: invalidate }),
-    hardwareCheck: useMutation({ mutationFn: deploymentsApi.hardwareCheck, onSuccess: invalidate }),
-    preflight: useMutation({ mutationFn: deploymentsApi.preflight, onSuccess: invalidate }),
+    hardwareCheck: useMutation({ mutationFn: () => deploymentsApi.hardwareCheck(scenarioId), onSuccess: invalidate }),
+    preflight: useMutation({ mutationFn: () => deploymentsApi.preflight(scenarioId), onSuccess: invalidate }),
     startEpc: useMutation({ mutationFn: deploymentsApi.startEpc, onSuccess: invalidate }),
-    emergencyStop: useMutation({ mutationFn: deploymentsApi.emergencyStop, onSuccess: invalidate }),
+    startCore: useMutation({ mutationFn: () => deploymentsApi.startCore(scenarioId), onSuccess: invalidate }),
+    startRf: useMutation({ mutationFn: (payload: RfStartPayload) => deploymentsApi.startRf(scenarioId, payload), onSuccess: invalidate }),
+    emergencyStop: useMutation({ mutationFn: () => deploymentsApi.emergencyStop(scenarioId), onSuccess: invalidate }),
   };
 }

@@ -1,6 +1,12 @@
 SHELL := /bin/bash
 
-.PHONY: build-5g-sa start-5g-sa stop-5g-sa restart-5g-sa status-5g-sa logs-5g-sa validate-5g-sa clean-5g-sa backend-install backend-dev backend-test backend-cov frontend-install frontend-dev frontend-build frontend-test app-build app-up app-down app-logs app-ps subscribers-test subscribers-integration-test build-4g-volte-sim start-4g-volte-sim stop-4g-volte-sim status-4g-volte-sim logs-4g-volte-sim validate-4g-volte-sim test-4g-volte-sim build-4g-lte-x310 check-x310 preflight-4g-lte-x310 start-4g-lte-x310-epc start-4g-lte-x310-rf emergency-stop-4g-lte-x310 stop-4g-lte-x310 status-4g-lte-x310 logs-4g-lte-x310 validate-4g-lte-x310 test-4g-lte-x310 build-5g-vonr-sim start-5g-vonr-sim stop-5g-vonr-sim restart-5g-vonr-sim status-5g-vonr-sim logs-5g-vonr-sim validate-5g-vonr-sim test-5g-vonr-sim build-5g-x310 check-5g-x310 preflight-5g-x310 start-5g-x310-core dry-run-5g-x310 start-5g-x310-rf emergency-stop-5g-x310 stop-5g-x310 status-5g-x310 logs-5g-x310 test-5g-x310
+.PHONY: images-check images-pull build-5g-sa start-5g-sa stop-5g-sa restart-5g-sa status-5g-sa logs-5g-sa validate-5g-sa clean-5g-sa backend-install backend-dev backend-test backend-cov frontend-install frontend-dev frontend-build frontend-test app-build app-up app-down app-logs app-ps subscribers-test subscribers-integration-test build-4g-lte-sim start-4g-lte-sim stop-4g-lte-sim restart-4g-lte-sim status-4g-lte-sim logs-4g-lte-sim validate-4g-lte-sim test-4g-lte-sim build-4g-volte-sim start-4g-volte-sim stop-4g-volte-sim status-4g-volte-sim logs-4g-volte-sim validate-4g-volte-sim test-4g-volte-sim build-4g-lte-x310 check-x310 preflight-4g-lte-x310 start-4g-lte-x310-epc start-4g-lte-x310-rf emergency-stop-4g-lte-x310 stop-4g-lte-x310 status-4g-lte-x310 logs-4g-lte-x310 validate-4g-lte-x310 test-4g-lte-x310 build-5g-vonr-sim start-5g-vonr-sim stop-5g-vonr-sim restart-5g-vonr-sim status-5g-vonr-sim logs-5g-vonr-sim validate-5g-vonr-sim test-5g-vonr-sim build-5g-x310 check-5g-x310 preflight-5g-x310 start-5g-x310-core dry-run-5g-x310 start-5g-x310-rf emergency-stop-5g-x310 stop-5g-x310 status-5g-x310 logs-5g-x310 test-5g-x310
+
+images-check:
+	@./lain5g images list all
+
+images-pull:
+	@./lain5g images pull all
 
 build-5g-sa:
 	@if [ "$${LAIN5G_DRY_RUN:-false}" = "true" ]; then \
@@ -106,6 +112,32 @@ subscribers-integration-test:
 		exit 2; \
 	fi
 	@echo "Run the documented subscriber integration workflow in docs/subscribers.md."
+
+build-4g-lte-sim:
+	docker build -t lain5g-lab/open5gs:local images/open5gs
+	docker build -t lain5g-lab/srsran4g-sim:local images/srsran4g-sim
+
+start-4g-lte-sim:
+	@deployments/4g-lte-sim/scripts/start.sh
+
+stop-4g-lte-sim:
+	@deployments/4g-lte-sim/scripts/stop.sh
+
+restart-4g-lte-sim:
+	@deployments/4g-lte-sim/scripts/restart.sh
+
+status-4g-lte-sim:
+	@deployments/4g-lte-sim/scripts/status.sh
+
+logs-4g-lte-sim:
+	@deployments/4g-lte-sim/scripts/logs.sh
+
+validate-4g-lte-sim:
+	@deployments/4g-lte-sim/scripts/validate.sh
+
+test-4g-lte-sim:
+	.venv/bin/pytest backend/tests/test_4g_lte_sim_static.py
+	@deployments/4g-lte-sim/scripts/test.sh
 
 build-4g-volte-sim:
 	docker build -t lain5g-lab/srsran4g-sim:local images/srsran4g-sim
@@ -232,3 +264,19 @@ logs-5g-x310:
 test-5g-x310:
 	.venv/bin/pytest backend/tests/test_5g_x310_static.py
 	@deployments/5g-sa-x310/scripts/test.sh
+
+IMS_REAL_FLAGS ?=
+
+.PHONY: ims-real-images ims-real-preflight ims-real-status ims-real-stop
+
+ims-real-images:
+	.venv/bin/python scripts/ims_real.py images $(IMS_REAL_FLAGS)
+
+ims-real-preflight:
+	.venv/bin/python scripts/ims_real.py preflight $(IMS_REAL_FLAGS)
+
+ims-real-status:
+	.venv/bin/python scripts/ims_real.py status $(IMS_REAL_FLAGS)
+
+ims-real-stop:
+	.venv/bin/python scripts/ims_real.py stop $(IMS_REAL_FLAGS)

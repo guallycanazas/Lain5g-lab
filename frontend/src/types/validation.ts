@@ -1,4 +1,4 @@
-export type ValidationState = 'PASS' | 'PARTIAL' | 'FAIL' | 'WARNING' | 'NOT_TESTED';
+export type ValidationState = 'PASS' | 'PARTIAL' | 'FAIL' | 'WARNING' | 'NOT_TESTED' | 'RUNNING';
 
 export interface ValidationCheck {
   id: string;

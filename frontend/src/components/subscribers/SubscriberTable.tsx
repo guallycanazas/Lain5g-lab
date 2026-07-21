@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { Copy, Eye, KeyRound, Pencil, Trash2 } from 'lucide-react';
 import type { SubscriberSummary } from '../../types/subscriber';
 
 interface SubscriberTableProps {
@@ -9,35 +10,30 @@ interface SubscriberTableProps {
 
 export function SubscriberTable({ subscribers, onClone, onDelete }: SubscriberTableProps) {
   return (
-    <div className="table-wrap">
-      <table>
+    <div className="table-wrap subscriber-table-wrap">
+      <table className="subscriber-table">
         <thead>
           <tr>
             <th>IMSI</th>
             <th>MSISDN</th>
-            <th>DNN</th>
-            <th>Slice</th>
-            <th>K</th>
-            <th>OP</th>
-            <th>OPc</th>
+            <th>Network profile</th>
+            <th>Authentication</th>
             <th>Acciones</th>
           </tr>
         </thead>
         <tbody>
           {subscribers.map((subscriber) => (
             <tr key={subscriber.imsi}>
-              <td>{subscriber.imsi}</td>
+              <td><span className="subscriber-id">{subscriber.imsi}</span></td>
               <td>{subscriber.msisdn || 'n/a'}</td>
-              <td>{subscriber.dnn || 'n/a'}</td>
-              <td>{subscriber.sst ?? 'n/a'} / {subscriber.sd || 'n/a'}</td>
-              <td>{subscriber.security.k_configured ? 'Configurada' : 'No'}</td>
-              <td>{subscriber.security.op_configured ? 'Configurada' : 'No'}</td>
-              <td>{subscriber.security.opc_configured ? 'Configurada' : 'No'}</td>
-              <td className="inline-actions">
-                <Link to={`/subscribers/${subscriber.imsi}`}>Ver</Link>
-                <Link to={`/subscribers/${subscriber.imsi}/edit`}>Editar</Link>
-                <button className="secondary" onClick={() => onClone(subscriber)}>Clonar</button>
-                <button className="danger" onClick={() => onDelete(subscriber)}>Eliminar</button>
+              <td><strong>{subscriber.dnn || 'n/a'}</strong><span className="table-secondary">S-NSSAI {subscriber.sst ?? 'n/a'} / {subscriber.sd || 'n/a'}</span></td>
+              <td><div className="security-flags"><span className={subscriber.security.k_configured ? 'configured' : ''}><KeyRound size={12} />K</span><span className={subscriber.security.op_configured ? 'configured' : ''}>OP</span><span className={subscriber.security.opc_configured ? 'configured' : ''}>OPc</span></div></td>
+              <td><div className="row-actions">
+                <Link className="row-action" to={`/subscribers/${subscriber.imsi}`} title="Ver"><Eye size={15} /><span>Ver</span></Link>
+                <Link className="row-action" to={`/subscribers/${subscriber.imsi}/edit`} title="Editar"><Pencil size={15} /><span>Editar</span></Link>
+                <button className="row-action secondary" onClick={() => onClone(subscriber)}><Copy size={15} /><span>Clonar</span></button>
+                <button className="row-action danger" onClick={() => onDelete(subscriber)}><Trash2 size={15} /><span>Eliminar</span></button>
+              </div>
               </td>
             </tr>
           ))}

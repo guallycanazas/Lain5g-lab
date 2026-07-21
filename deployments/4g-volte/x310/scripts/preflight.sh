@@ -38,8 +38,13 @@ fi
 if [ -f "$channel" ]; then
   grep -Eq '^downlink_frequency_hz:[[:space:]]*[0-9]+' "$channel" && add channel_frequency PASS "frequency configured" || add channel_frequency FAIL "frequency not configured"
 fi
-if [ "${LAIN5G_DRY_RUN:-false}" = "true" ]; then add hardware NOT_TESTED "dry-run mode"; add uhd NOT_TESTED "dry-run mode"; add fpga NOT_TESTED "dry-run mode"; else "$script_dir/hardware-check.sh" >"$run_dir/logs/hardware-check.log" 2>&1 && add hardware PASS "hardware check passed" || add hardware FAIL "hardware check failed"; "$script_dir/uhd-check.sh" >"$run_dir/logs/uhd-check.log" 2>&1 && add uhd PASS "UHD check passed" || add uhd FAIL "UHD check failed"; "$script_dir/fpga-check.sh" >"$run_dir/logs/fpga-check.log" 2>&1 && add fpga PASS "FPGA compatible" || add fpga FAIL "FPGA unknown or incompatible"; fi
-(cd "$scenario_dir" && [ -n "$(docker compose --env-file ../common/.env -f docker-compose.yml ps --status running -q mme 2>/dev/null)" ]) && add epc PASS "MME running" || add epc WARNING "EPC not running yet"
+if [ "${LAIN5G_DRY_RUN:-false}" = "true" ]; then add hardware NOT_TESTED "dry-run mode"; add uhd NOT_TESTED "dry-run mode"; add fpga NOT_TESTED "dry-run mode"; else "$script_dir/hardware-check.sh" >"$run_dir/logs/hardware-check.log" 2>&1 && add hardware PASS "hardware check passed" || add hardware FAIL "hardware check failed"; "$script_dir/uhd-check.sh" >"$run_dir/logs/uhd-check.log" 2>&1 && add uhd PASS "UHD check passed" || add uhd FAIL "UHD check failed"; "$script_dir/fpga-check.sh" "$run_dir/logs/uhd-check.log" >"$run_dir/logs/fpga-check.log" 2>&1 && add fpga PASS "FPGA compatible" || add fpga FAIL "FPGA unknown or incompatible"; fi
+mme_addr="$(sed -n 's/^[[:space:]]*mme_addr[[:space:]]*=[[:space:]]*//p' "$scenario_dir/ran/enb.conf" | head -n1)"
+if [ "$mme_addr" = "172.22.0.9" ]; then
+  if [ "$(docker inspect -f '{{.State.Running}}' lain5g-lab-ims-real-4g-mme-1 2>/dev/null || true)" = true ]; then add epc PASS "real IMS MME running"; elif [ "${REQUIRE_RF_READY:-false}" = true ]; then add epc FAIL "real IMS MME must be running before RF start"; else add epc WARNING "real IMS EPC not running yet"; fi
+elif (cd "$scenario_dir" && [ -n "$(docker compose --env-file ../common/.env -f docker-compose.yml ps --status running -q mme 2>/dev/null)" ]); then
+  add epc PASS "MME running"
+elif [ "${REQUIRE_RF_READY:-false}" = true ]; then add epc FAIL "MME must be running before RF start"; else add epc WARNING "EPC not running yet"; fi
 status=PASS; for c in "${checks[@]}"; do IFS='|' read -r _ st _ <<< "$c"; [ "$st" = FAIL ] && status=FAIL; done
 printf '{"scenario":"4g-lte-x310","run_id":"%s","created_at":"%s","dry_run":%s}\n' "$run_id" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$([ "${LAIN5G_DRY_RUN:-false}" = "true" ] && printf true || printf false)" > "$run_dir/metadata.json"
 {

@@ -24,5 +24,8 @@ mme:
   security:
     integrity_order: [ EIA2, EIA1, EIA0 ]
     ciphering_order: [ EEA0, EEA1, EEA2 ]
+  network_name:
+    full: Lain
+    short: Lain
 hss:
   address: hss

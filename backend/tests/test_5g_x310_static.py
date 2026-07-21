@@ -15,6 +15,8 @@ def test_required_5g_x310_files_exist():
         IMAGE / "README.md",
         DEPLOY / "docker-compose.yml",
         DEPLOY / ".env.example",
+        DEPLOY / "open5gs" / "amf.yaml",
+        DEPLOY / "open5gs" / "smf.yaml",
         DEPLOY / "gnb" / "gnb_x310.yml",
         DEPLOY / "rf" / "channel-plan.example.yaml",
         DEPLOY / "rf" / "safety-manifest.example.yaml",
@@ -22,6 +24,7 @@ def test_required_5g_x310_files_exist():
         DEPLOY / "scripts" / "preflight.sh",
         DEPLOY / "scripts" / "start-core.sh",
         DEPLOY / "scripts" / "start-gnb.sh",
+        DEPLOY / "scripts" / "stop.sh",
         DEPLOY / "scripts" / "emergency-stop.sh",
         ROOT / "docs" / "5g_x310_cots_ue_checklist.md",
     ]
@@ -52,7 +55,8 @@ def test_compose_is_isolated_and_rf_profile_only():
     assert "rtprio: 99" in compose
     assert "privileged" not in compose
     assert "lain5g-lab/ueransim" not in compose
-    assert "../5g-sa/open5gs/amf.yaml" in compose
+    assert "./open5gs/amf.yaml" in compose
+    assert "./open5gs/smf.yaml" in compose
 
 
 def test_env_example_does_not_commit_rf_values_or_secrets():
@@ -71,6 +75,7 @@ def test_gnb_config_targets_x310_and_open5gs_mapping():
     assert "addr: ${AMF_ADDR}" in gnb
     assert "plmn: \"${MCC}${MNC}\"" in gnb
     assert "channel_bandwidth_MHz: ${CHANNEL_BANDWIDTH_MHZ}" in gnb
+    assert "srate: ${SAMPLE_RATE_MHZ}" in gnb
 
 
 def test_rf_start_requires_guardrails_and_scripts_are_non_destructive():
@@ -81,6 +86,8 @@ def test_rf_start_requires_guardrails_and_scripts_are_non_destructive():
     assert "ip route replace" in start_core
     assert "lain5g-lab-5g-sa-x310-upf" in start_core
     assert "LAIN5G_ALLOW_5G_RF_START" in start
+    assert "sleep 5" in start
+    assert ".State.Running" in start
     assert "REQUIRE_RF_READY=true" in start
     assert "cpupower frequency-set -g performance" in start
     assert "authorization_confirmed" in preflight
@@ -91,3 +98,17 @@ def test_rf_start_requires_guardrails_and_scripts_are_non_destructive():
         text = script.read_text(encoding="utf-8")
         assert "docker system prune" not in text
         assert "uhd_image_loader" not in text
+
+
+def test_5g_scenarios_stop_each_other_and_release_the_shared_address_space():
+    stop = (DEPLOY / "scripts" / "stop.sh").read_text(encoding="utf-8")
+    start_core = (DEPLOY / "scripts" / "start-core.sh").read_text(encoding="utf-8")
+    simulation_start = (ROOT / "deployments/5g-sa/scripts/start.sh").read_text(encoding="utf-8")
+    simulation_stop = (ROOT / "deployments/5g-sa/scripts/stop.sh").read_text(encoding="utf-8")
+    assert "down --remove-orphans" in stop
+    assert "down --remove-orphans" in simulation_stop
+    assert 'x310_project="lain5g-lab-5g-sa-x310"' in simulation_start
+    assert 'deployments/5g-sa-x310/scripts/stop.sh' in simulation_start
+    assert 'simulation_project="lain5g-lab-5g-sa"' in start_core
+    assert 'deployments/5g-sa/scripts/stop.sh' in start_core
+    assert "Removed stopped 5G SA containers with stale network references" in simulation_start

@@ -7,6 +7,8 @@ export function deploymentLabel(status: DeploymentState | string): string {
     stopped: 'Detenido',
     partial: 'Parcial',
     error: 'Error',
+    starting: 'Starting',
+    validating: 'Validating',
     unknown: 'Desconocido',
     dry_run: 'Dry-run',
   };
@@ -20,6 +22,7 @@ export function validationLabel(status: ValidationState | string): string {
     FAIL: 'FAIL',
     WARNING: 'WARNING',
     NOT_TESTED: 'NOT TESTED',
+    RUNNING: 'RUNNING',
   };
   return labels[status] || status;
 }
@@ -41,6 +44,12 @@ export function validationDescription(id: string): string {
     ue_tun: 'Interfaz TUN creada',
     ue_ip: 'Dirección IP asignada',
     ping: 'Ping de datos exitoso',
+    ng_setup: 'NG Setup completado',
+    s1_setup: 'S1 Setup completado',
+    ims: 'Servicios IMS disponibles',
+    sip_register: 'Registro SIP observado',
+    hardware: 'Hardware SDR detectado',
+    preflight: 'Preflight aprobado',
   };
   return labels[id] || id;
 }

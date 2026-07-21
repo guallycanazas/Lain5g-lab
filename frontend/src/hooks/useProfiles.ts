@@ -15,6 +15,7 @@ export function useProfileActions(profile: string | null) {
   const invalidate = async () => {
     await queryClient.invalidateQueries({ queryKey: ['profiles'] });
     await queryClient.invalidateQueries({ queryKey: ['profile', profile] });
+    await queryClient.invalidateQueries({ queryKey: ['profile-diff', profile] });
   };
   return {
     update: useMutation({ mutationFn: (payload: ProfileConfig) => profilesApi.update(profile || '', payload), onSuccess: invalidate }),

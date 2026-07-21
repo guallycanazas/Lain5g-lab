@@ -56,6 +56,19 @@ export interface DeploymentActionResponse {
   message: string;
 }
 
+export interface RfStartPayload {
+  execute: boolean;
+  confirmation_phrase: string;
+  operator_note: string;
+  requested_duration_seconds: number;
+  acknowledgements: {
+    legal_authorization_valid: boolean;
+    isolation_and_attenuation_verified: boolean;
+    channel_and_gain_reviewed: boolean;
+    emergency_stop_accessible: boolean;
+  };
+}
+
 export interface LogsResponse {
   id: string;
   container: string | null;

@@ -2,7 +2,7 @@
 set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 scenario_dir="$(cd "$script_dir/.." && pwd)"
-env_file="$scenario_dir/.env"
+env_file="${1:-$scenario_dir/.env}"
 [ -f "$env_file" ] && set -a && source "$env_file" && set +a
 addr="${USRP_ADDR:-192.168.10.2}"
 usrp_type="${USRP_TYPE:-x300}"

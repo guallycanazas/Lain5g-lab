@@ -2,15 +2,16 @@ import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { PreferencesProvider } from '../src/preferences/PreferencesProvider';
 
 export function renderWithClient(ui: ReactElement, route = '/') {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return render(
-    <QueryClientProvider client={queryClient}>
+    <PreferencesProvider><QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[route]}>{ui}</MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider></PreferencesProvider>,
   );
 }
 
@@ -19,14 +20,14 @@ export function renderRoute(path: string, element: ReactElement, route = path) {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return render(
-    <QueryClientProvider client={queryClient}>
+    <PreferencesProvider><QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[route]}>
         <Routes>
           <Route path={path} element={element} />
           <Route path="/subscribers/:imsi" element={<div>subscriber-detail</div>} />
         </Routes>
       </MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider></PreferencesProvider>,
   );
 }
 

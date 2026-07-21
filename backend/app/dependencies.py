@@ -4,6 +4,8 @@ from .services.command_service import CommandService
 from .services.deployment_service import DeploymentService
 from .services.open5gs_connection_service import Open5GSConnectionService
 from .services.profile_config_service import ProfileConfigService
+from .services.preparation_service import PreparationService
+from .services.real_ims_service import RealIMSService
 from .services.run_service import RunService
 from .services.subscriber_service import SubscriberService
 from .services.validation_service import ValidationService
@@ -29,7 +31,7 @@ def get_validation_service() -> ValidationService:
 
 @lru_cache
 def get_deployment_service() -> DeploymentService:
-    return DeploymentService(get_settings(), get_command_service(), get_run_service(), get_validation_service())
+    return DeploymentService(get_settings(), get_command_service(), get_run_service(), get_validation_service(), get_preparation_service())
 
 
 @lru_cache
@@ -45,6 +47,16 @@ def get_subscriber_service() -> SubscriberService:
 @lru_cache
 def get_profile_config_service() -> ProfileConfigService:
     return ProfileConfigService(get_settings())
+
+
+@lru_cache
+def get_preparation_service() -> PreparationService:
+    return PreparationService(get_settings(), get_command_service())
+
+
+@lru_cache
+def get_real_ims_service() -> RealIMSService:
+    return RealIMSService(get_settings())
 
 
 def settings_dependency() -> Settings:

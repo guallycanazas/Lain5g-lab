@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 
 from ..dependencies import get_deployment_service
-from ..models.deployment import DeploymentActionResponse, DeploymentStatus, DeploymentSummary, LogsResponse
+from ..models.deployment import DeploymentActionResponse, DeploymentStatus, DeploymentSummary, LogsResponse, RfStartRequest
 from ..models.validation import ValidationReport
 from ..services.deployment_service import DeploymentService
 
@@ -71,3 +71,32 @@ def x310_start_epc(service: DeploymentService = Depends(get_deployment_service))
 @router.post("/4g-lte-x310/emergency-stop", response_model=DeploymentActionResponse)
 def x310_emergency_stop(service: DeploymentService = Depends(get_deployment_service)) -> DeploymentActionResponse:
     return service.emergency_stop("4g-lte-x310")
+
+
+@router.post("/{scenario}/start-core", response_model=DeploymentActionResponse)
+def start_rf_core(scenario: str, service: DeploymentService = Depends(get_deployment_service)) -> DeploymentActionResponse:
+    return service.start_core(scenario)
+
+
+@router.post("/{scenario}/start-rf", response_model=DeploymentActionResponse)
+def start_guarded_rf(
+    scenario: str,
+    payload: RfStartRequest,
+    service: DeploymentService = Depends(get_deployment_service),
+) -> DeploymentActionResponse:
+    return service.start_rf(scenario, payload)
+
+
+@router.post("/{scenario}/hardware-check", response_model=DeploymentActionResponse)
+def scenario_hardware_check(scenario: str, service: DeploymentService = Depends(get_deployment_service)) -> DeploymentActionResponse:
+    return service.hardware_check(scenario)
+
+
+@router.post("/{scenario}/preflight", response_model=DeploymentActionResponse)
+def scenario_preflight(scenario: str, service: DeploymentService = Depends(get_deployment_service)) -> DeploymentActionResponse:
+    return service.preflight(scenario)
+
+
+@router.post("/{scenario}/emergency-stop", response_model=DeploymentActionResponse)
+def scenario_emergency_stop(scenario: str, service: DeploymentService = Depends(get_deployment_service)) -> DeploymentActionResponse:
+    return service.emergency_stop(scenario)

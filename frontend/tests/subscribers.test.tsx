@@ -43,7 +43,7 @@ describe('Subscriber management', () => {
     }));
 
     renderWithClient(<SubscribersPage />);
-    await userEvent.type(await screen.findByLabelText('Búsqueda IMSI/MSISDN'), '001010');
+    await userEvent.type(await screen.findByLabelText('Search IMSI / MSISDN'), '001010');
     await waitFor(() => expect(fetch).toHaveBeenCalledWith(expect.stringContaining('search=001010'), expect.any(Object)));
   });
 

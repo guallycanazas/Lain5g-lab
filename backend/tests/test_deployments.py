@@ -1,13 +1,13 @@
 from backend.app.models.deployment import CommandResult, DeploymentStatus
 
 
-def test_list_deployments_includes_four_scenarios(client):
+def test_list_deployments_includes_simulation_and_x310_scenarios(client):
     response = client.get("/api/deployments")
 
     assert response.status_code == 200
     payload = response.json()
     ids = {item["id"] for item in payload}
-    assert ids == {"5g-sa", "4g-volte-sim", "5g-vonr-sim", "4g-lte-x310"}
+    assert ids == {"5g-sa", "4g-lte-sim", "4g-lte-x310", "5g-sa-x310"}
     assert all(item["status"] == "dry_run" for item in payload)
 
 
@@ -27,6 +27,18 @@ def test_x310_is_rf_controlled(client):
     assert payload["mode"] == "rf-controlled"
     assert payload["rf_capable"] is True
     assert "start" not in payload["supported_actions"]
+    assert "start-rf" in payload["supported_actions"]
+    assert "emergency-stop" in payload["supported_actions"]
+
+
+def test_experimental_nsa_is_hidden_but_guarded(client):
+    catalog = client.get("/api/deployments").json()
+    assert "5g-nsa-x310" not in {item["id"] for item in catalog}
+    response = client.get("/api/deployments/5g-nsa-x310")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["rf_capable"] is True
+    assert "start-rf" in payload["supported_actions"]
     assert "emergency-stop" in payload["supported_actions"]
 
 
@@ -95,6 +107,19 @@ def test_x310_specific_endpoints_are_available(client):
         response = client.post(f"/api/deployments/4g-lte-x310/{action}")
         assert response.status_code == 200
         assert response.json()["command"]["dry_run"] is True
+
+
+def test_guarded_rf_start_is_dry_run_by_default_for_x310_profiles(client):
+    for scenario in ["4g-lte-x310", "5g-sa-x310", "5g-nsa-x310"]:
+        response = client.post(f"/api/deployments/{scenario}/start-rf", json={})
+        assert response.status_code == 200
+        assert response.json()["status"] == "dry_run"
+        assert response.json()["command"]["dry_run"] is True
+
+
+def test_rf_execution_requires_all_acknowledgements(client):
+    response = client.post("/api/deployments/4g-lte-x310/start-rf", json={"execute": True})
+    assert response.status_code == 422
 
 
 def test_x310_normal_start_is_blocked(client):

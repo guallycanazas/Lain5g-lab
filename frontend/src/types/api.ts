@@ -3,6 +3,7 @@ export interface ApiErrorDetail {
   message?: string;
   exit_code?: number | null;
   stderr?: string | null;
+  active_scenario?: string | null;
 }
 
 export interface ApiErrorResponse {

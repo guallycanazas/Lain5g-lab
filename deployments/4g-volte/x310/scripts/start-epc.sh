@@ -27,6 +27,9 @@ fi
 
 for subnet in "${UE_INTERNET_SUBNET:-10.55.0.0/16}" "${UE_IMS_SUBNET:-}"; do
   [ -n "$subnet" ] || continue
-  "${route_cmd[@]}" "$subnet" via "$pgwu_ip"
-  echo "Installed host route: $subnet via $pgwu_ip"
+  if "${route_cmd[@]}" "$subnet" via "$pgwu_ip" 2>/dev/null; then
+    echo "Installed host route: $subnet via $pgwu_ip"
+  else
+    echo "WARNING: core is running, but host route $subnet could not be installed from this network namespace" >&2
+  fi
 done

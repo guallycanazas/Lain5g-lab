@@ -20,11 +20,10 @@ Lain5G-Lab no es un producto de red móvil para producción, una implementación
 
 | Escenario | Propósito | Estado reproducible | Limitaciones actuales |
 | --- | --- | --- | --- |
-| `5g-sa` | Core Open5GS, gNB y UE UERANSIM | Principal escenario software; valida registro, sesión PDU e IP cuando se cumplen todas las evidencias | Solo simulación software; no demuestra rendimiento ni conformidad con UE comercial |
-| `4g-volte/sim` | EPC/IMS con RAN software | Disponible para pruebas de EPC, datos e IMS básico | VoLTE extremo a extremo requiere evidencia SIP/RTP adicional |
-| `4g-volte/x310` | LTE con USRP X310 | Ruta de laboratorio con preflight y RF bloqueada por defecto | Requiere autorización, atenuación/aislamiento y validación específica del equipo |
-| `5g-sa-x310` | 5G SA con USRP X310 y srsRAN Project | Experimental; incluye imagen UHD, core 5G, preflight, auto-stop y logs | No debe afirmarse registro de UE comercial, sesión PDU ni rendimiento estable sin evidencia de la ejecución publicada |
-| `5g-vonr` | Preparación de VoNR software | Experimental | No debe presentarse como VoNR completo validado |
+| `5g-sa` | 5G simulado con Open5GS y UERANSIM | Valida registro, sesión PDU e IP sin hardware de radio | No incluye IMS ni VoNR |
+| `4g-lte-sim` | 4G simulado con EPC, srsENB y srsUE sobre ZMQ | Valida S1, attach, bearer, TUN y datos sin hardware de radio | No incluye IMS ni VoLTE |
+| `4g-lte-x310` | Preparación 4G VoLTE RF con X310 | Incluye EPC, IMS, eNB RF, preflight y auto-stop | Una llamada VoLTE requiere evidencia adicional de UE, SIP y RTP |
+| `5g-sa-x310` | Preparación 5G VoNR RF con X310 | Incluye 5GC, gNB RF, preflight y auto-stop | IMS, registro de UE y llamada VoNR aún no están integrados/validados |
 
 La evidencia mínima de éxito del escenario software 5G SA es: core iniciado, NG Setup, UE registrado, sesión PDU, interfaz TUN, IP asignada y ping desde el UE. Tener contenedores activos no es suficiente. Consulte `docs/validation.md`.
 
@@ -32,7 +31,7 @@ La evidencia mínima de éxito del escenario software 5G SA es: core iniciado, N
 
 - Open5GS proporciona funciones de core 4G/5G y MongoDB almacena sus suscriptores.
 - UERANSIM proporciona gNB y UE software en los escenarios simulados.
-- srsRAN 4G y srsRAN Project proporcionan las rutas SDR para X310.
+- srsRAN 4G proporciona la simulación ZMQ con srsENB/srsUE y la ruta SDR LTE; srsRAN Project proporciona la ruta SDR 5G para X310.
 - UHD proporciona acceso a USRP sin actualizar firmware ni FPGA automáticamente.
 - Kamailio y CoreDNS proporcionan servicios IMS mínimos para 4G.
 - Docker Compose crea redes y volúmenes por escenario para evitar interferencias.
@@ -65,13 +64,29 @@ Además de los requisitos anteriores:
 
 No ejecute RF en bandas licenciadas sin autorización legal, técnica e institucional. Los comandos RF están bloqueados por defecto y no se describen aquí como una receta de transmisión; use `docs/rf_safety.md`, `docs/x310_lte.md` y `docs/5g_x310_cots_ue_checklist.md`.
 
+Para operar desde la interfaz web:
+
+```bash
+make app-up
+```
+
+Abra `http://localhost:8080/scenarios/4g-lte-x310` o `http://localhost:8080/scenarios/5g-sa-x310`. `Core only` inicia el core sin transmitir. `Start core + RF` abre un diálogo que exige duración finita, nota del operador, manifiesto, plan de canal, entorno aislado, atenuación y la frase exacta de autorización. Sin seleccionar `Execute real RF`, el backend genera únicamente un plan dry-run. `Emergency stop` detiene inmediatamente el escenario.
+
+La preparación del equipo y las imágenes está disponible en `http://localhost:8080/preparation`. La página comprueba Docker, Compose, espacio y componentes por perfil, y descarga únicamente imágenes publicadas faltantes. No compila, inicia escenarios ni habilita RF.
+
+Los valores de PLMN, core, USRP, banda, ARFCN/EARFCN, ancho de banda, ganancias, reloj y seguridad se editan en `http://localhost:8080/deployments`. Use `Guardar borrador`, `Validar configuración` y `Aplicar al escenario`; el diálogo RF muestra los valores aplicados y bloquea el inicio mientras exista cualquier cambio pendiente.
+
+La consola interactiva está disponible con `./lain5g`. Permite revisar el equipo, comprobar o descargar imágenes precompiladas desde Docker Hub y operar los perfiles. Antes de iniciar un escenario detecta componentes faltantes y ofrece descargarlos sin compilar. El configurador separa red, core, RAN, TX/RX y seguridad; valida y muestra los archivos afectados antes de preguntar si debe aplicar.
+
 ## Inicio rápido: 5G SA software
 
 Use valores de laboratorio no sensibles. Los archivos `.env` están ignorados por Git.
 
+También puede ejecutar `make app-up` y abrir `http://localhost:8080/scenarios`. El catálogo público contiene cuatro perfiles: 5G UERANSIM simulado, 4G srsENB/srsUE ZMQ simulado, preparación 4G VoLTE RF y preparación 5G VoNR RF. Cada workspace explica capacidades, limitaciones y hardware antes de mostrar los controles operativos.
+
 ```bash
 cp deployments/5g-sa/.env.example deployments/5g-sa/.env
-make build-5g-sa
+./lain5g images pull 5g-sa
 make start-5g-sa
 make status-5g-sa
 make validate-5g-sa
@@ -95,10 +110,10 @@ Para 4G software:
 
 ```bash
 cp deployments/4g-volte/common/.env.example deployments/4g-volte/common/.env
-make build-4g-volte-sim
-make start-4g-volte-sim
-make validate-4g-volte-sim
-make stop-4g-volte-sim
+./lain5g images pull 4g-lte-sim
+make start-4g-lte-sim
+make validate-4g-lte-sim
+make stop-4g-lte-sim
 ```
 
 Para inspección no transmisora de 5G X310:

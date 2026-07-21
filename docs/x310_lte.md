@@ -32,6 +32,10 @@ LAIN5G_ALLOW_RF_START=true make start-4g-lte-x310-rf
 
 El script ejecuta preflight, arranca solo `enb-x310`, espera la duración definida y ejecuta auto-stop.
 
+## Inicio Desde La Interfaz
+
+Ejecute `make app-up` y abra `http://localhost:8080/scenarios/4g-lte-x310`. Use `Core only` para verificar EPC e IMS sin RF. `Start core + RF` muestra el plan de canal efectivo y exige completar las guardas antes de habilitar una ejecución real; si `Execute real RF` permanece desmarcado, la acción es un dry-run que no transmite. El botón `Emergency stop` permanece disponible en el workspace.
+
 ## Limitaciones Detectadas
 
 En este host no se detectaron `uhd_find_devices`, `uhd_usrp_probe` ni `uhd_config_info` en `PATH`. Por eso la versión UHD host y el estado FPGA real del X310 no pudieron validarse desde esta sesión.

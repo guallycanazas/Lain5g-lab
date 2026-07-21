@@ -6,11 +6,11 @@ scenario_dir="$(cd "$script_dir/.." && pwd)"
 repo_dir="$(cd "$scenario_dir/../.." && pwd)"
 
 if [ "${LAIN5G_DRY_RUN:-false}" = "true" ]; then
-  echo "DRY RUN: docker compose --env-file .env -f docker-compose.yml stop"
+  echo "DRY RUN: docker compose --env-file .env -f docker-compose.yml down --remove-orphans"
   exit 0
 fi
 
-(cd "$scenario_dir" && docker compose --env-file .env -f docker-compose.yml stop)
+(cd "$scenario_dir" && docker compose --env-file .env -f docker-compose.yml down --remove-orphans)
 
 latest_run="$(find "$repo_dir/runs" -mindepth 1 -maxdepth 1 -type d -name 'run-*' | sort | tail -n 1 || true)"
 if [ -n "$latest_run" ] && [ -f "$latest_run/metadata.json" ]; then

@@ -7,7 +7,38 @@
 - Acceso a Internet para clonar y compilar Open5GS y UERANSIM durante `make build-5g-sa`.
 - Para X310: red host preparada para USRP y herramientas UHD en host si se desea validar hardware fuera del contenedor.
 
-## Construcción
+## Preparación recomendada
+
+La consola comprueba Docker, Compose, TUN, espacio, configuración e imágenes:
+
+```bash
+./lain5g
+```
+
+Selecciona `Imágenes y componentes` para comprobar o descargar lo necesario. Las imágenes compatibles se descargan desde Docker Hub y se etiquetan automáticamente con los nombres internos del laboratorio; no se compila ni se inicia ningún servicio.
+
+La misma preparación está disponible en la interfaz web después de `make app-up`:
+
+```text
+http://localhost:8080/preparation
+```
+
+También se puede preparar un perfil directamente:
+
+```bash
+./lain5g doctor 4g-lte-sim
+./lain5g images pull 4g-lte-sim
+```
+
+Para descargar todos los componentes publicados:
+
+```bash
+make images-pull
+```
+
+## Construcción alternativa
+
+La construcción local solo es necesaria para desarrollar o modificar los componentes:
 
 ```bash
 make build-5g-sa
@@ -16,6 +47,7 @@ make build-5g-sa
 Para 4G software:
 
 ```bash
+make build-4g-lte-sim
 make build-4g-volte-sim
 ```
 
@@ -27,7 +59,7 @@ make build-4g-lte-x310
 
 La imagen X310 compila UHD y puede tardar bastante más que la ruta software.
 
-Esto crea imágenes locales:
+Esto crea las mismas etiquetas locales que la descarga automática:
 
 - `lain5g-lab/open5gs:local`
 - `lain5g-lab/ueransim:local`

@@ -1,12 +1,16 @@
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .api import deployments, health, profiles, runs, subscribers, validation
+from .api import deployments, health, preparation, profiles, real_ims, runs, subscribers, validation
 from .models.deployment import ErrorDetail, ErrorResponse
 from .services.command_service import CommandSecurityError
 from .services.deployment_service import DeploymentCommandError, DeploymentConflictError, DeploymentNotFoundError
+from .services.preparation_service import PreparationError
 from .services.run_service import RunSecurityError
+from .services.real_ims_service import RealIMSError
 from .services.subscriber_service import SubscriberServiceError
 from .settings import get_settings
 
@@ -33,6 +37,8 @@ def create_app() -> FastAPI:
     app.include_router(subscribers.router)
     app.include_router(profiles.router)
     app.include_router(validation.router)
+    app.include_router(real_ims.router)
+    app.include_router(preparation.router)
 
     register_exception_handlers(app)
     return app
@@ -44,6 +50,11 @@ def error_response(status_code: int, code: str, message: str, *, exit_code: int 
 
 
 def register_exception_handlers(app: FastAPI) -> None:
+    @app.exception_handler(RequestValidationError)
+    async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+        errors = _redact_validation_errors(jsonable_encoder(exc.errors()))
+        return JSONResponse(status_code=422, content={"detail": errors})
+
     @app.exception_handler(DeploymentNotFoundError)
     async def deployment_not_found_handler(request: Request, exc: DeploymentNotFoundError) -> JSONResponse:
         return error_response(404, "DEPLOYMENT_NOT_FOUND", str(exc))
@@ -68,6 +79,14 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def subscriber_error_handler(request: Request, exc: SubscriberServiceError) -> JSONResponse:
         return error_response(exc.status_code, exc.code, exc.message)
 
+    @app.exception_handler(RealIMSError)
+    async def real_ims_error_handler(request: Request, exc: RealIMSError) -> JSONResponse:
+        return error_response(409, "REAL_IMS_CONFLICT", "The real IMS operation could not be completed.")
+
+    @app.exception_handler(PreparationError)
+    async def preparation_error_handler(request: Request, exc: PreparationError) -> JSONResponse:
+        return error_response(exc.status_code, exc.code, exc.message)
+
     from .services.profile_config_service import ProfileConfigError
 
     @app.exception_handler(ProfileConfigError)
@@ -80,3 +99,22 @@ def register_exception_handlers(app: FastAPI) -> None:
 
 
 app = create_app()
+
+
+def _redact_secret_values(value):
+    if isinstance(value, dict):
+        return {
+            key: "[REDACTED]" if str(key).lower() in {"ki", "opc"} else _redact_secret_values(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact_secret_values(item) for item in value]
+    return value
+
+
+def _redact_validation_errors(errors):
+    redacted = _redact_secret_values(errors)
+    for error in redacted:
+        if any(str(part).lower() in {"ki", "opc"} for part in error.get("loc", [])):
+            error["input"] = "[REDACTED]"
+    return redacted

@@ -16,6 +16,11 @@ class DeploymentDefinition:
     expected_services: list[str] = field(default_factory=list)
     log_services: list[str] = field(default_factory=list)
     scripts_path: str | None = None
+    core_start_script: str | None = None
+    rf_start_script: str | None = None
+    rf_guard_variable: str | None = None
+    rf_service: str | None = None
+    catalog_visible: bool = True
 
     @property
     def scripts_dir(self) -> str:
@@ -27,8 +32,8 @@ COMMON_5G_CHECKS = ["ng_setup", "ue_registration", "pdu_session", "ue_ip", "ue_t
 DEPLOYMENTS: dict[str, DeploymentDefinition] = {
     "5g-sa": DeploymentDefinition(
         id="5g-sa",
-        name="5G SA",
-        description="Open5GS 5GC with UERANSIM gNB/UE and internet PDU validation.",
+        name="5G - Simulación UERANSIM",
+        description="5G SA completamente simulado con Open5GS, gNB/UE UERANSIM y sesión PDU de datos; no incluye VoNR.",
         deployment_path="deployments/5g-sa",
         mode="simulation",
         supported_actions=["start", "stop", "restart", "status", "logs", "validate"],
@@ -46,6 +51,18 @@ DEPLOYMENTS: dict[str, DeploymentDefinition] = {
         validation_checks=["s1_setup", "ue_registration", "default_bearer", "ue_ip", "ue_tun", "data_ping", "ims_dns", "sip_register"],
         expected_services=["mongo", "mme", "hss", "sgwc", "sgwu", "pgwc", "pgwu", "pcrf", "enb", "ue", "pcscf", "icscf", "scscf", "dns"],
         log_services=["mongo", "mme", "hss", "sgwc", "sgwu", "pgwc", "pgwu", "pcrf", "enb", "ue", "pcscf", "icscf", "scscf", "dns", "sip-register"],
+        catalog_visible=False,
+    ),
+    "4g-lte-sim": DeploymentDefinition(
+        id="4g-lte-sim",
+        name="4G - Simulación srsRAN ZMQ",
+        description="LTE completamente simulado con Open5GS EPC, srsENB y srsUE sobre ZMQ; no incluye IMS ni VoLTE.",
+        deployment_path="deployments/4g-lte-sim",
+        mode="simulation",
+        supported_actions=["start", "stop", "restart", "status", "logs", "validate"],
+        validation_checks=["s1_setup", "ue_registration", "default_bearer", "ue_ip", "ue_tun", "data_ping"],
+        expected_services=["mongo", "mme", "hss", "sgwc", "sgwu", "pgwc", "pgwu", "pcrf", "enb", "ue"],
+        log_services=["mongo", "mme", "hss", "sgwc", "sgwu", "pgwc", "pgwu", "pcrf", "enb", "ue"],
     ),
     "5g-vonr-sim": DeploymentDefinition(
         id="5g-vonr-sim",
@@ -57,18 +74,56 @@ DEPLOYMENTS: dict[str, DeploymentDefinition] = {
         validation_checks=["ng_setup", "ue_registration", "pdu_internet", "pdu_ims", "ue_internet_ip", "ue_ims_ip", "ue_internet_tun", "ue_ims_tun", "data_ping", "ims_dns", "sip_register"],
         expected_services=["mongo", "nrf", "amf", "smf", "upf", "ausf", "udm", "udr", "pcf", "gnb", "ue", "pcscf", "icscf", "scscf", "dns"],
         log_services=["mongo", "nrf", "amf", "smf", "upf", "ausf", "udm", "udr", "pcf", "gnb", "ue", "pcscf", "icscf", "scscf", "dns", "sip-register"],
+        catalog_visible=False,
     ),
     "4g-lte-x310": DeploymentDefinition(
         id="4g-lte-x310",
-        name="LTE RF + USRP X310",
-        description="RF CONTROLADO: X310 LTE profile limited to hardware checks, preflight, EPC, logs, S1 evidence, and emergency stop from the app.",
+        name="4G - Preparación VoLTE RF (X310)",
+        description="Base LTE RF con Open5GS EPC, IMS, srsRAN eNB y USRP X310; todavía no demuestra una llamada VoLTE completa.",
         deployment_path="deployments/4g-volte/x310",
         mode="rf-controlled",
-        supported_actions=["stop", "status", "logs", "validate", "hardware-check", "preflight", "start-epc", "emergency-stop"],
+        supported_actions=["stop", "status", "logs", "validate", "hardware-check", "preflight", "start-core", "start-epc", "start-rf", "emergency-stop"],
         validation_checks=["hardware_detected", "ethernet_link", "uhd_available", "uhd_fpga_compatible", "epc_services", "mme_ready", "rf_preflight", "enb_started", "s1_setup", "auto_stop", "logs_captured"],
         rf_capable=True,
         expected_services=["mongo", "mme", "hss", "sgwc", "sgwu", "pgwc", "pgwu", "pcrf", "pcscf", "icscf", "scscf", "dns", "enb-x310"],
         log_services=["mongo", "mme", "hss", "sgwc", "sgwu", "pgwc", "pgwu", "pcrf", "pcscf", "icscf", "scscf", "dns", "enb-x310"],
+        core_start_script="start-epc",
+        rf_start_script="start-enb",
+        rf_guard_variable="LAIN5G_ALLOW_RF_START",
+        rf_service="enb-x310",
+    ),
+    "5g-sa-x310": DeploymentDefinition(
+        id="5g-sa-x310",
+        name="5G - Preparación VoNR RF (X310)",
+        description="Base 5G SA RF con Open5GS, srsRAN Project gNB y USRP X310; IMS y llamada VoNR aún no están integrados.",
+        deployment_path="deployments/5g-sa-x310",
+        mode="rf-controlled",
+        supported_actions=["stop", "status", "logs", "validate", "hardware-check", "preflight", "start-core", "start-rf", "emergency-stop"],
+        validation_checks=["hardware_detected", "uhd_available", "core_services", "amf_ready", "rf_preflight", "gnb_started", "ng_setup", "auto_stop", "logs_captured"],
+        rf_capable=True,
+        expected_services=["mongo", "nrf", "ausf", "udm", "udr", "pcf", "upf", "smf", "amf", "gnb-x310"],
+        log_services=["mongo", "nrf", "ausf", "udm", "udr", "pcf", "upf", "smf", "amf", "gnb-x310"],
+        core_start_script="start-core",
+        rf_start_script="start-gnb",
+        rf_guard_variable="LAIN5G_ALLOW_5G_RF_START",
+        rf_service="gnb-x310",
+    ),
+    "5g-nsa-x310": DeploymentDefinition(
+        id="5g-nsa-x310",
+        name="5G NSA experimental (X300/X310)",
+        description="Prototipo EN-DC integrado de srsRAN 4G con LTE B7 y NR n3; no está validado con iPhone.",
+        deployment_path="deployments/5g-nsa-x310",
+        mode="rf-controlled",
+        supported_actions=["stop", "status", "logs", "hardware-check", "preflight", "start-core", "start-rf", "emergency-stop"],
+        validation_checks=["dual_rf_chains", "epc_ready", "s1_setup", "lte_attach", "nr_secondary_cell", "auto_stop", "logs_captured"],
+        rf_capable=True,
+        expected_services=["mongo", "mme", "hss", "sgwc", "sgwu", "pgwc", "pgwu", "pcrf", "enb-nsa-x310"],
+        log_services=["enb-nsa-x310"],
+        core_start_script="start-core",
+        rf_start_script="start-rf",
+        rf_guard_variable="LAIN5G_ALLOW_5G_NSA_RF_START",
+        rf_service="enb-nsa-x310",
+        catalog_visible=False,
     ),
 }
 
@@ -79,3 +134,7 @@ def get_deployment_definition(scenario: str) -> DeploymentDefinition | None:
 
 def list_deployment_definitions() -> list[DeploymentDefinition]:
     return list(DEPLOYMENTS.values())
+
+
+def list_catalog_deployment_definitions() -> list[DeploymentDefinition]:
+    return [definition for definition in DEPLOYMENTS.values() if definition.catalog_visible]

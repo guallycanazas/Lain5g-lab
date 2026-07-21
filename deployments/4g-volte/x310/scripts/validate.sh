@@ -31,7 +31,7 @@ if [ "${LAIN5G_DRY_RUN:-false}" = "true" ]; then for id in hardware_detected eth
 "$(dirname "${BASH_SOURCE[0]}")/hardware-check.sh" >"$run_dir/logs/hardware-check.log" 2>&1 && add hardware_detected PASS "X310 detected" || add hardware_detected FAIL "X310 not detected"
 grep -q 'ethernet_link.*PASS' "$run_dir/logs/hardware-check.log" && add ethernet_link PASS "compatible local subnet found" || add ethernet_link WARNING "ethernet not proven compatible"
 "$(dirname "${BASH_SOURCE[0]}")/uhd-check.sh" >"$run_dir/logs/uhd-check.log" 2>&1 && add uhd_available PASS "UHD probe passed" || add uhd_available FAIL "UHD probe failed"
-"$(dirname "${BASH_SOURCE[0]}")/fpga-check.sh" >"$run_dir/logs/fpga-check.log" 2>&1 && add uhd_fpga_compatible PASS "FPGA compatible" || add uhd_fpga_compatible FAIL "FPGA compatibility unknown"
+"$(dirname "${BASH_SOURCE[0]}")/fpga-check.sh" "$run_dir/logs/uhd-check.log" >"$run_dir/logs/fpga-check.log" 2>&1 && add uhd_fpga_compatible PASS "FPGA compatible" || add uhd_fpga_compatible FAIL "FPGA compatibility unknown"
 for svc in mme hss sgwc sgwu pgwc pgwu pcrf; do running "$svc" || epc_fail=1; done; [ "${epc_fail:-0}" = 0 ] && add epc_services PASS "EPC services running" || add epc_services FAIL "EPC incomplete"
 running mme && add mme_ready PASS "MME running" || add mme_ready FAIL "MME not running"
 for svc in pcscf icscf scscf; do running "$svc" || ims_fail=1; done; [ "${ims_fail:-0}" = 0 ] && add ims_services PASS "IMS services running" || add ims_services FAIL "IMS incomplete"

@@ -2,10 +2,8 @@ import type { ValidationCheck } from '../types/validation';
 import { extractDetectedValue, validationDescription } from '../utils/status';
 import { StatusBadge } from './StatusBadge';
 
-const orderedChecks = ['mongo', 'nrf', 'amf', 'smf', 'upf', 'ausf', 'udm', 'udr', 'pcf', 'ng_connection', 'ue_registration', 'pdu_session', 'ue_tun', 'ue_ip', 'ping'];
-
 export function ValidationTable({ checks, checkedAt }: { checks: ValidationCheck[]; checkedAt?: string | null }) {
-  const byId = new Map(checks.map((check) => [check.id, check]));
+  if (!checks.length) return <div className="empty-state"><h3>No validation evidence</h3><p>Run validation to inspect infrastructure, control plane and user-plane checks.</p></div>;
   return (
     <div className="table-wrap">
       <table>
@@ -13,14 +11,13 @@ export function ValidationTable({ checks, checkedAt }: { checks: ValidationCheck
           <tr><th>Control</th><th>Estado</th><th>Valor</th><th>Evidencia</th><th>Fecha</th></tr>
         </thead>
         <tbody>
-          {orderedChecks.map((id) => {
-            const check = byId.get(id);
+          {checks.map((check) => {
             return (
-              <tr key={id}>
-                <td>{validationDescription(id)}</td>
-                <td><StatusBadge status={check?.status || 'NOT_TESTED'} kind="validation" /></td>
-                <td>{extractDetectedValue(check?.detail)}</td>
-                <td>{check?.detail || 'Sin evidencia reportada'}</td>
+              <tr key={check.id}>
+                <td>{validationDescription(check.id)}<span className="validation-item-id">{check.id}</span></td>
+                <td><StatusBadge status={check.status} kind="validation" /></td>
+                <td>{extractDetectedValue(check.detail)}</td>
+                <td>{check.detail || 'Sin evidencia reportada'}</td>
                 <td>{checkedAt || 'Sin fecha'}</td>
               </tr>
             );

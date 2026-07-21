@@ -41,3 +41,4 @@ Use este checklist antes de cualquier transmisión RF con `5g-sa-x310`. No regis
 - Ejecutar `make dry-run-5g-x310`.
 - Iniciar core con `make start-5g-x310-core`.
 - No ejecutar `make start-5g-x310-rf` hasta contar con autorización local y `LAIN5G_ALLOW_5G_RF_START=true` en el entorno del operador.
+- Alternativamente, ejecutar `make app-up` y abrir `http://localhost:8080/scenarios/5g-sa-x310`; `Core only` no transmite y `Start core + RF` permanece en dry-run salvo que el operador complete todas las guardas y seleccione explícitamente `Execute real RF`.

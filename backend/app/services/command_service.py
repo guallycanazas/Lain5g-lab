@@ -55,13 +55,14 @@ class CommandService:
         *,
         cwd: str | Path | None = None,
         dry_run: bool | None = None,
+        timeout: int | None = None,
     ) -> CommandResult:
         if not command:
             raise CommandSecurityError("Command must not be empty")
         cwd_path = self._resolve_inside_project(cwd or ".")
         if command[0].startswith("/"):
             self._ensure_inside_project(Path(command[0]).resolve())
-        return self._run(command, cwd_path, dry_run=self.settings.dry_run if dry_run is None else dry_run)
+        return self._run(command, cwd_path, dry_run=self.settings.dry_run if dry_run is None else dry_run, timeout=timeout)
 
     def redact(self, value: str) -> str:
         redacted_lines: list[str] = []
@@ -72,7 +73,7 @@ class CommandService:
             redacted_lines.append(line)
         return "\n".join(redacted_lines)
 
-    def _run(self, command: list[str], cwd_path: Path, *, dry_run: bool) -> CommandResult:
+    def _run(self, command: list[str], cwd_path: Path, *, dry_run: bool, timeout: int | None = None) -> CommandResult:
         started_at = datetime.now(UTC)
         if dry_run:
             finished_at = datetime.now(UTC)
@@ -98,7 +99,7 @@ class CommandService:
                 cwd=cwd_path,
                 capture_output=True,
                 text=True,
-                timeout=self.settings.command_timeout,
+                timeout=timeout or self.settings.command_timeout,
                 check=False,
                 shell=False,
                 env=env,

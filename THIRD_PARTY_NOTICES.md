@@ -79,6 +79,21 @@ CoreDNS se utiliza como DNS IMS de laboratorio en el escenario 4G.
 
 ## herlesupreeth/docker_open5gs
 
-El proyecto `herlesupreeth/docker_open5gs` se reconoce únicamente como referencia metodológica e histórica para despliegues Docker de Open5GS/IMS. Lain5G-Lab no copia sus carpetas completas ni reutiliza sus imágenes como base.
+El paquete IMS real importa una instantánea revisada de configuraciones BSD-2-Clause de `herlesupreeth/docker_open5gs` y utiliza imágenes upstream fijadas por digest para Open5GS, Kamailio, pyHSS y MySQL. La procedencia y los hashes se registran en `deployments/ims-real/config-provenance.json`; las imágenes base se registran en `deployments/ims-real/images.lock.yaml`.
 
 - Proyecto: https://github.com/herlesupreeth/docker_open5gs
+- Licencia de las configuraciones importadas: BSD-2-Clause.
+
+## pyHSS
+
+pyHSS proporciona HSS IMS y aprovisionamiento interno en el paquete IMS real. Su API no se publica en el host.
+
+- Proyecto: https://github.com/nickvsnetworking/pyhss
+- Licencia: AGPL-3.0 según el proyecto upstream.
+
+## RTPengine
+
+RTPengine proporciona el relay de medios del paquete IMS real.
+
+- Proyecto: https://github.com/sipwise/rtpengine
+- Licencia: GPL-3.0 según el proyecto upstream.

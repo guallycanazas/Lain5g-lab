@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 DeploymentState = Literal["running", "stopped", "partial", "error", "unknown", "dry_run"]
@@ -73,6 +73,31 @@ class DeploymentActionResponse(BaseModel):
     status: DeploymentState
     command: CommandResult
     message: str
+
+
+class RfAcknowledgements(BaseModel):
+    legal_authorization_valid: bool = False
+    isolation_and_attenuation_verified: bool = False
+    channel_and_gain_reviewed: bool = False
+    emergency_stop_accessible: bool = False
+
+
+class RfStartRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    execute: bool = False
+    confirmation_phrase: str = ""
+    operator_note: str = Field(default="", max_length=240)
+    requested_duration_seconds: int = Field(default=60, ge=1, le=600)
+    acknowledgements: RfAcknowledgements = Field(default_factory=RfAcknowledgements)
+
+    @model_validator(mode="after")
+    def require_execution_guards(self) -> "RfStartRequest":
+        if self.execute and not all(self.acknowledgements.model_dump().values()):
+            raise ValueError("All RF safety acknowledgements are required")
+        if self.execute and len(self.operator_note.strip()) < 3:
+            raise ValueError("An operator note is required for RF execution")
+        return self
 
 
 class LogsResponse(BaseModel):

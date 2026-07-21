@@ -8,8 +8,15 @@ deployments/5g-sa-x310/.rf-active
 deployments/5g-sa-x310/gnb/.runtime/
 deployments/5g-sa-x310/rf/channel-plan.yaml
 deployments/5g-sa-x310/rf/safety-manifest.yaml
+deployments/5g-nsa-x310/.env
+deployments/5g-nsa-x310/.rf-active
+deployments/5g-nsa-x310/ran/.runtime/
+deployments/5g-nsa-x310/rf/channel-plan.yaml
+deployments/5g-nsa-x310/rf/safety-manifest.yaml
 deployments/5g-vonr/.env
 deployments/5g-vonr/ueransim/.runtime/
+deployments/ims-real/.runtime/
+config/real-ims-subscriber.json
 backend/.env
 frontend/.env
 frontend/.env.local
