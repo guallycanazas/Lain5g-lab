@@ -1,6 +1,6 @@
 # Lain5G-Lab
 
-Lain5G-Lab es un entorno de investigación reproducible para desplegar, administrar y validar escenarios de laboratorio 4G LTE/EPC/IMS y 5G SA. Integra componentes abiertos ya existentes, principalmente Open5GS, UERANSIM, srsRAN y UHD, y añade una capa propia de configuración, automatización, validación, trazabilidad de ejecuciones y una interfaz React + FastAPI.
+Lain5G-Lab es un entorno de investigación reproducible para desplegar, administrar y validar escenarios de laboratorio 4G LTE/EPC/IMS, 5G SA y 5G NSA experimental. Integra componentes abiertos ya existentes, principalmente Open5GS, pyHSS, Kamailio, UERANSIM, srsRAN y UHD, y añade una capa propia de configuración, automatización, validación, trazabilidad de ejecuciones y una interfaz React + FastAPI.
 
 El repositorio no implementa un core 4G/5G ni una pila RAN desde cero. Su contribución es hacer reproducible la integración de esos componentes en escenarios aislados, con separación de redes Docker, validación por evidencias, configuración declarativa y protecciones para RF.
 
@@ -8,7 +8,7 @@ El repositorio no implementa un core 4G/5G ni una pila RAN desde cero. Su contri
 
 La contribución de Lain5G-Lab es una base experimental para estudiar y repetir flujos de despliegue y validación de redes celulares privadas de laboratorio. El software aporta:
 
-- Escenarios Docker aislados para 5G SA software, 4G LTE/EPC/IMS software y rutas X310 controladas.
+- Escenarios Docker aislados para 5G SA software, 4G LTE/EPC/IMS software, IMS real y rutas SDR controladas.
 - Configuración local separada de los valores versionados, para no publicar claves, IMSI, MSISDN, planes de canal ni autorizaciones RF.
 - Scripts de validación que distinguen `PASS`, `FAIL`, `WARNING` y `NOT_TESTED` y guardan evidencia en `runs/`.
 - API FastAPI e interfaz React que reutilizan los flujos validados de terminal en lugar de duplicar lógica de despliegue.
@@ -18,22 +18,40 @@ Lain5G-Lab no es un producto de red móvil para producción, una implementación
 
 ## Estado y madurez de escenarios
 
+### Estado validado del laboratorio
+
+La última validación integral de esta etapa se realizó el 21 de julio de 2026 sobre una USRP X300 revisión 10 con dos daughterboards UBX-160 v2 revisión 4. UHD identificó dos cadenas RF independientes, rango de 10 MHz a 6 GHz y 160 MHz de ancho de banda por daughterboard. La FPGA HG reportó versión 39.3 y hash `d375d68` con UHD 4.10.
+
+Resultados observados y reproducidos en ese host:
+
+- 4G LTE B7: S1 conectado, attach de UE comercial completado y bearer de datos activo.
+- VoLTE/IMS: bearer `internet` QCI 9, bearer `ims` QCI 5/ARP 1, autorización Rx, desafío AKA, Cx MAR/SAR y registro SIP autenticado con respuesta 200.
+- Señalización IMS posterior al registro: se observaron `SUBSCRIBE`, `NOTIFY`, `MESSAGE` e `INVITE` originados por el UE.
+- 5G NSA experimental B7+n3: apertura simultánea de las dos cadenas RF, arranque EN-DC y S1 aceptado por el MME. No se obtuvo evidencia suficiente de activación de la celda secundaria NR en el UE.
+- Calidad de software: 149 pruebas backend, 42 pruebas frontend y build de producción del frontend completados correctamente.
+
+Los resultados anteriores demuestran integración y señalización en el entorno descrito. No equivalen a certificación 3GPP ni prueban por sí solos una llamada VoLTE completa con RTP bidireccional.
+
 | Escenario | Propósito | Estado reproducible | Limitaciones actuales |
 | --- | --- | --- | --- |
 | `5g-sa` | 5G simulado con Open5GS y UERANSIM | Valida registro, sesión PDU e IP sin hardware de radio | No incluye IMS ni VoNR |
 | `4g-lte-sim` | 4G simulado con EPC, srsENB y srsUE sobre ZMQ | Valida S1, attach, bearer, TUN y datos sin hardware de radio | No incluye IMS ni VoLTE |
-| `4g-lte-x310` | Preparación 4G VoLTE RF con X310 | Incluye EPC, IMS, eNB RF, preflight y auto-stop | Una llamada VoLTE requiere evidencia adicional de UE, SIP y RTP |
-| `5g-sa-x310` | Preparación 5G VoNR RF con X310 | Incluye 5GC, gNB RF, preflight y auto-stop | IMS, registro de UE y llamada VoNR aún no están integrados/validados |
+| `4g-volte-sim` | Señalización VoLTE simulada | Valida LTE ZMQ, IMS y registro SIP autenticado | No demuestra voz sobre RF ni RTP extremo a extremo |
+| `5g-vonr-sim` | Señalización VoNR simulada | Valida sesiones `internet`/`ims` y registro SIP autenticado | No demuestra llamada VoNR sobre radio real |
+| `4g-lte-x310` | 4G VoLTE sobre SDR; nombre histórico del escenario | Validado con X300: S1, attach, datos, bearer IMS y registro SIP AKA | Falta una llamada extremo a extremo con RTP bidireccional documentado |
+| `5g-sa-x310` | Preparación 5G SA/VoNR sobre SDR | Incluye 5GC, gNB RF, preflight y auto-stop | Registro de UE comercial, IMS y VoNR no validados en hardware |
+| `5g-nsa-x310` | Prototipo EN-DC LTE B7 + NR n3 | Dos cadenas RF y S1 validados con X300 | No hay evidencia concluyente de celda secundaria NR activa |
+| `ims-real` | Core IMS 4G/5G separado | P/I/S-CSCF, pyHSS, Cx, Rx, DNS, RTPengine y registro 4G autenticado | No incluye RAN y no prueba llamada/RTP por sí solo |
 
-La evidencia mínima de éxito del escenario software 5G SA es: core iniciado, NG Setup, UE registrado, sesión PDU, interfaz TUN, IP asignada y ping desde el UE. Tener contenedores activos no es suficiente. Consulte `docs/validation.md`.
+La evidencia mínima de éxito del escenario software 5G SA es: core iniciado, NG Setup, UE registrado, sesión PDU, interfaz TUN, IP asignada y ping desde el UE. Para IMS se exige REGISTER, desafío, autorización, SIP 200 y evidencia Cx; una llamada requiere además diálogo INVITE completo y RTP bidireccional. Tener contenedores activos no es suficiente. Consulte `docs/validation.md` y `docs/real_ims.md`.
 
 ## Arquitectura
 
 - Open5GS proporciona funciones de core 4G/5G y MongoDB almacena sus suscriptores.
 - UERANSIM proporciona gNB y UE software en los escenarios simulados.
-- srsRAN 4G proporciona la simulación ZMQ con srsENB/srsUE y la ruta SDR LTE; srsRAN Project proporciona la ruta SDR 5G para X310.
+- srsRAN 4G proporciona la simulación ZMQ, la ruta SDR LTE y el prototipo EN-DC; srsRAN Project proporciona la ruta SDR 5G SA.
 - UHD proporciona acceso a USRP sin actualizar firmware ni FPGA automáticamente.
-- Kamailio y CoreDNS proporcionan servicios IMS mínimos para 4G.
+- Kamailio, pyHSS, DNS y RTPengine proporcionan el stack IMS real separado para 4G y 5G.
 - Docker Compose crea redes y volúmenes por escenario para evitar interferencias.
 - `backend/` contiene la API FastAPI y `frontend/` la interfaz React.
 - `runs/` contiene artefactos de validación locales; se ignora en Git para evitar publicar datos de operación.
@@ -52,17 +70,17 @@ La arquitectura detallada está en `docs/architecture.md`; las dependencias y av
 
 Las versiones de software de radio y core se fijan en los Dockerfiles. Revise `docs/versions.md` y los `Dockerfile` antes de comparar resultados entre hosts.
 
-### Escenarios USRP X310
+### Escenarios USRP X-Series
 
 Además de los requisitos anteriores:
 
-- USRP X310 autorizado para el laboratorio, con FPGA/firmware compatible y daughterboards adecuados para la banda de prueba.
+- USRP X300/X310 autorizado para el laboratorio, con FPGA/firmware compatible y daughterboards adecuados para la banda de prueba. El hardware validado en esta etapa fue una X300 con dos UBX-160 v2.
 - Interfaz Ethernet dedicada, dirección IP en la subred del USRP y MTU compatible con el flujo UHD. Para flujos jumbo se requiere soporte extremo a extremo; la configuración del host debe verificarse antes de RF.
 - Permisos para Docker, `NET_ADMIN`, prioridades de tiempo real y, cuando aplique, `cpupower`.
 - Entorno conducido, blindado o formalmente autorizado, según normativa aplicable y política institucional.
 - Manifiesto local de seguridad, plan de canal y confirmación explícita del operador.
 
-No ejecute RF en bandas licenciadas sin autorización legal, técnica e institucional. Los comandos RF están bloqueados por defecto y no se describen aquí como una receta de transmisión; use `docs/rf_safety.md`, `docs/x310_lte.md` y `docs/5g_x310_cots_ue_checklist.md`.
+Los identificadores `4g-lte-x310`, `5g-sa-x310` y `5g-nsa-x310` se conservan por compatibilidad con scripts y API, aunque los perfiles actuales también aceptan X300. No ejecute RF en bandas licenciadas sin autorización legal, técnica e institucional. Los comandos RF están bloqueados por defecto y no se describen aquí como una receta de transmisión; use `docs/rf_safety.md`, `docs/x310_lte.md` y `docs/5g_x310_cots_ue_checklist.md`.
 
 Para operar desde la interfaz web:
 
@@ -70,7 +88,7 @@ Para operar desde la interfaz web:
 make app-up
 ```
 
-Abra `http://localhost:8080/scenarios/4g-lte-x310` o `http://localhost:8080/scenarios/5g-sa-x310`. `Core only` inicia el core sin transmitir. `Start core + RF` abre un diálogo que exige duración finita, nota del operador, manifiesto, plan de canal, entorno aislado, atenuación y la frase exacta de autorización. Sin seleccionar `Execute real RF`, el backend genera únicamente un plan dry-run. `Emergency stop` detiene inmediatamente el escenario.
+Abra `http://localhost:8080/scenarios/4g-lte-x310` o `http://localhost:8080/scenarios/5g-sa-x310`. El prototipo NSA se encuentra en `http://localhost:8080/scenarios/5g-nsa-x310` y la operación IMS separada en `http://localhost:8080/ims-real`. `Core only` inicia el core sin transmitir. `Start core + RF` abre un diálogo que exige duración finita, nota del operador, manifiesto, plan de canal, entorno aislado, atenuación y la frase exacta de autorización. Sin seleccionar `Execute real RF`, el backend genera únicamente un plan dry-run. `Emergency stop` detiene inmediatamente el escenario.
 
 La preparación del equipo y las imágenes está disponible en `http://localhost:8080/preparation`. La página comprueba Docker, Compose, espacio y componentes por perfil, y descarga únicamente imágenes publicadas faltantes. No compila, inicia escenarios ni habilita RF.
 
@@ -82,7 +100,7 @@ La consola interactiva está disponible con `./lain5g`. Permite revisar el equip
 
 Use valores de laboratorio no sensibles. Los archivos `.env` están ignorados por Git.
 
-También puede ejecutar `make app-up` y abrir `http://localhost:8080/scenarios`. El catálogo público contiene cuatro perfiles: 5G UERANSIM simulado, 4G srsENB/srsUE ZMQ simulado, preparación 4G VoLTE RF y preparación 5G VoNR RF. Cada workspace explica capacidades, limitaciones y hardware antes de mostrar los controles operativos.
+También puede ejecutar `make app-up` y abrir `http://localhost:8080/scenarios`. El catálogo público contiene cuatro perfiles: 5G UERANSIM simulado, 4G srsENB/srsUE ZMQ simulado, 4G VoLTE RF y preparación 5G SA RF. Los prototipos NSA y las variantes IMS simuladas permanecen fuera del catálogo principal, pero conservan rutas y comandos explícitos. Cada workspace explica capacidades, limitaciones y hardware antes de mostrar los controles operativos.
 
 ```bash
 cp deployments/5g-sa/.env.example deployments/5g-sa/.env
@@ -160,7 +178,7 @@ No publique `.env`, claves de suscriptor, IMSI/MSISDN reales, direcciones de inf
 
 ## API y aplicación web
 
-El backend administra el escenario 5G SA reutilizando scripts validados:
+El backend administra los escenarios registrados reutilizando scripts validados:
 
 ```bash
 make backend-install
@@ -184,6 +202,12 @@ La interfaz queda disponible en `http://127.0.0.1:8080`. Consulte `docs/backend.
 - Los datos de suscriptores son datos de laboratorio y deben anonimizarse antes de cualquier publicación.
 - El repositorio usa perfiles de ejemplo y archivos locales ignorados para separar software publicable de operación del laboratorio.
 - La limpieza destructiva de Docker no forma parte de los flujos automatizados de escenario.
+
+## Cierre de la etapa experimental
+
+La etapa funcional cubierta por este repositorio queda cerrada con una aplicación web operativa, configuración declarativa, preparación reproducible, simulación 4G/5G, control RF protegido, IMS real y registro VoLTE autenticado sobre X300. Los perfiles versionados permanecen bloqueados para RF y toda autorización, plan operativo, credencial de abonado y evidencia de ejecución se mantiene en archivos locales ignorados.
+
+Quedan deliberadamente fuera del resultado validado: certificación 3GPP, llamada VoLTE extremo a extremo con medición RTP, registro de UE comercial en 5G SA y activación confirmada de la celda secundaria NR en NSA. Estas tareas deben tratarse como trabajo experimental futuro y no como capacidades demostradas.
 
 ## Licencia, dependencias y citación
 
@@ -215,6 +239,6 @@ La [guía editorial oficial de SoftwareX](https://www.sciencedirect.com/journal/
 - `docs/validation.md`: evidencias de validación esperadas.
 - `docs/configuration.md`: perfiles y configuración.
 - `docs/troubleshooting.md`: diagnóstico de problemas.
-- `docs/4g_volte.md`, `docs/4g_simulation.md`, `docs/ims.md` y `docs/volte_validation.md`: 4G/IMS.
+- `docs/4g_volte.md`, `docs/4g_simulation.md`, `docs/ims.md`, `docs/real_ims.md` y `docs/volte_validation.md`: 4G/IMS.
 - `docs/x310_lte.md`, `docs/5g_x310_cots_ue_checklist.md` y `docs/rf_safety.md`: SDR y seguridad RF.
 - `docs/versions.md` y `docs/third_party.md`: versiones y dependencias.
